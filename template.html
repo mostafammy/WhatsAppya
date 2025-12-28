@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>{chat_name}</h1>
+            <div class="subtitle">{message_count} messages</div>
+        </div>
+        <div class="messages-container">
+            {messages}
+        </div>
+    </div>
+
+    <!-- Modal for viewing media -->
+    <div id="mediaModal" class="modal" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <div class="modal-content" id="modalContent"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
