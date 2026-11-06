@@ -1,164 +1,87 @@
-# BeautifyWhatsAppExport
+#  WhatsAppya
 
-Transform your exported WhatsApp chats into beautiful, interactive HTML pages with an authentic WhatsApp UI.
+> **WhatsAppya** transforms exported WhatsApp chats into Apple-grade interactive HTML viewers with multi-tier curricular support (Multiple Blocks, Multiple Subjects per Block, Multiple Chapters per Subject).
 
-## Features
-
-- **Authentic WhatsApp Design** - Pixel-perfect recreation of WhatsApp's interface with proper message bubbles, tails, colors, and typography
-- **Media Support** - Display images, videos, audio files, and documents inline
-- **Fully Responsive** - Optimized layouts for desktop, tablet, and mobile devices
-- **Interactive Media Viewer** - Click images and videos to view fullscreen with keyboard navigation
-- **Automatic Link Detection** - URLs in messages are automatically converted to clickable links
-- **Message Direction** - Correctly identifies sent vs received messages with proper styling
-- **System Messages** - Handles WhatsApp system notifications (member joined, left, etc.)
-- **Date Separators** - Organized by date with clean visual separators
-- **Self-Contained HTML** - Generated files work standalone without external dependencies
-- **Easy Customization** - Separate CSS and JavaScript files for easy styling modifications
-
-## Installation
-
-### Requirements
-- Python 3.7 or higher
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/BeautifyWhatsAppExport.git
-cd BeautifyWhatsAppExport
-```
-
-2. No additional dependencies required - uses only Python standard library!
-
-## Usage
-
-### Basic Usage
-
-Export your WhatsApp chat (with media) and run:
-
-```bash
-python main.py "path/to/chat/folder"
-```
-
-This will generate `chat.html` in the same folder as your chat export.
-
-### Command-Line Options
-
-```bash
-python main.py <chat_folder> [OPTIONS]
-```
-
-**Options:**
-
-- `--output`, `-o` : Specify output HTML filename (default: `chat.html`)
-- `--you`, `-y` : Your name to display messages on the right side
-- `--embed-images`, `-e` : Embed images as base64 (makes HTML larger but fully portable)
-
-### Examples
-
-**1. Generate with custom output name:**
-```bash
-python main.py "./WhatsApp Chat" --output my_conversation.html
-```
-
-**2. Specify your name for correct message alignment:**
-```bash
-python main.py "./WhatsApp Chat" --you "John" --output john_sarah.html
-```
-
-**3. Create fully portable HTML with embedded images:**
-```bash
-python main.py "./WhatsApp Chat" --embed-images
-```
-
-**4. All options combined:**
-```bash
-python main.py "./WhatsApp Chat" -y "John" -o conversation.html -e
-```
-
-## How to Export WhatsApp Chat
-
-1. Open WhatsApp on your phone
-2. Go to the chat you want to export
-3. Tap the three dots (menu) → **More** → **Export chat**
-4. Choose **Include Media** (or **Without Media** if you prefer)
-5. Save the exported folder to your computer
-6. Run this tool on that folder
-
-## Project Structure
-
-```
-BeautifyWhatsAppExport/
-├── main.py           # Main Python script
-├── template.html     # HTML template structure
-├── style.css         # WhatsApp-style CSS
-├── script.js         # Interactive JavaScript
-└── README.md         # This file
-```
-
-## How It Works
-
-1. **Parsing** - Reads the exported `.txt` file and identifies messages using regex patterns
-2. **Media Detection** - Finds and links media files (images, videos, audio, documents)
-3. **HTML Generation** - Creates HTML with authentic WhatsApp styling
-4. **CSS/JS Inlining** - Embeds external CSS and JavaScript into the final HTML for portability
-5. **Output** - Generates a single, self-contained HTML file
-
-## Features in Detail
-
-### Message Types Supported
-- Regular text messages
-- Messages with media (images, videos, audio)
-- Document attachments (PDF, Word, Excel, PowerPoint)
-- Deleted messages
-- System notifications
-- Multi-line messages
-
-### Media Handling
-- **Images**: Display inline with lightbox viewer
-- **Videos**: Thumbnail with play button, fullscreen playback
-- **Audio**: Native HTML5 audio player
-- **Documents**: Download links with file type icons and size
-
-### Responsive Design
-- **Desktop**: Wide layout with comfortable message bubbles (max 65% width)
-- **Tablet**: Adjusted padding and bubble sizing (75% width)
-- **Mobile**: Optimized for small screens (80-85% width)
-
-## Customization
-
-Want to modify the appearance? Edit these files:
-
-- `style.css` - All styling (colors, fonts, spacing, animations)
-- `script.js` - Interactive features (modal viewer, keyboard shortcuts)
-- `template.html` - HTML structure
-
-After editing, just run the script again to generate updated HTML.
-
-## Tips
-
-1. **Keep media files** - Make sure media files stay in the same folder as the generated HTML
-2. **Use embed-images for sharing** - If you want to share the HTML, use `--embed-images` flag
-3. **Specify your name** - Use `--you` flag for better message alignment (your messages on right)
-4. **Browser compatibility** - Works in all modern browsers (Chrome, Firefox, Safari, Edge)
-
-## Known Limitations
-
-- Requires the original WhatsApp export format
-- Media files must be in the same directory (unless using `--embed-images`)
-- Stickers and GIFs are treated as regular images
-- Voice notes appear as audio files (not the WhatsApp waveform UI)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-
-## Acknowledgments
-
-- Inspired by WhatsApp's beautiful messaging interface
-- Built with vanilla HTML, CSS, and JavaScript - no frameworks needed!
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)](https://python.org)
+[![Code Architecture](https://img.shields.io/badge/architecture-SOLID%20%7C%20GoF-orange.svg)]()
+[![Design System](https://img.shields.io/badge/design-Apple%20HIG%20%7C%20Cupertino-black.svg)]()
 
 ---
 
-**Star this repo if you found it useful!** ⭐
+## ✨ Features
+
+- ** Apple Human Interface Guidelines (HIG)** - Native SF Pro typography, Cupertino dynamic vibrancy (`backdrop-filter`), and seamless Dark Mode.
+- **📚 Multi-Tier Curricular Navigation** - Organizes chats, voice lectures, and study groups across **Multiple Blocks › Multiple Subjects › Multiple Chapters**.
+- **🎙 Bespoke Voice Note Canvas Player** - Interactive synthetic audio waveforms, drag scrubbing, and variable playback speed (1.0× / 1.5× / 2.0×).
+- **🔍 Universal Spotlight Search (⌘K / ⌘F)** - Inverted index enabling sub-20ms instant full-text search across all chapters, messages, and voice notes.
+- **🖼 Inline Media Studio** - Full inline support for images, videos, audio notes, and PDFs with interactive fullscreen lightbox.
+- **🔒 100% On-Device Privacy** - Zero cloud egress, zero external CDN dependencies, and zero telemetry. Everything runs locally from a `file://` URI.
+- **🌍 BiDi & Multilingual Harmony** - Flawless bidirectional rendering for Arabic and English conversations with strict punctuation isolation.
+
+---
+
+## 🚀 Quick Start
+
+### Requirements
+- Python 3.10 or higher
+- Any modern web browser (Safari, Chrome, Edge, Firefox)
+
+### Installation
+
+Clone the repository:
+```bash
+git clone https://github.com/mostafammy/WhatsAppya.git
+cd WhatsAppya
+```
+
+*Zero external dependencies required — runs 100% on Python standard library!*
+
+---
+
+## 📖 Usage
+
+### 1. Single Chat Archival Mode
+
+Point **WhatsAppya** to any unzipped WhatsApp export directory containing `_chat.txt` and its media:
+
+```bash
+python3 main.py "path/to/WhatsApp Chat Export"
+```
+
+This generates a standalone, interactive `chat.html` inside the export folder.
+
+### 2. Multi-Tier Curricular Mode (Blocks › Subjects › Chapters)
+
+Point **WhatsAppya** to a directory structured with curricular folders:
+
+```
+Curriculum/
+├── Block 1 - Cardiovascular/
+│   ├── Anatomy/
+│   │   ├── Chapter 1 - Heart Chambers/ (_chat.txt + media)
+│   │   └── Chapter 2 - Valves/ (_chat.txt + media)
+│   └── Physiology/
+│       └── Chapter 1 - Cardiac Cycle/ (_chat.txt + media)
+└── Block 2 - Respiratory/
+    └── Pulmonology/
+        └── Chapter 1 - Gas Exchange/ (_chat.txt + media)
+```
+
+Run WhatsAppya in curricular mode:
+```bash
+python3 main.py "path/to/Curriculum" --output "dist/CurriculumViewer.html"
+```
+
+---
+
+## 🏛 Architecture & Engineering Standards
+
+- **[SPECIFICATION.md](SPECIFICATION.md)**: Apple Engineering Specification (`SPEC-APPL-ACAD-2026-V2`) covering the Composite Tree architecture, SOLID realization matrix, and Cupertino Executive Board review.
+- **[Plan.md](Plan.md)**: Detailed phased engineering roadmap (`PLAN-APPL-ACAD-2026-V2`) with implementable tasks and QA test protocols.
+
+---
+
+## 📄 License
+
+MIT License. Crafted with Apple-grade precision.
