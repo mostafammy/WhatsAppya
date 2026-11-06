@@ -1,0 +1,24 @@
+# Personal WhatsApp Chats & Sensitive Data
+WhatsAppChat/
+result/
+*.zip
+*.opus
+*.mp4
+*.m4a
+*.aac
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.pdf
+_chat.txt
+
+# Operating System & IDE
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+*$py.class
+*.swp
+*.swo

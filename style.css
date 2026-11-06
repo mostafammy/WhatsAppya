@@ -151,6 +151,7 @@ body {
     color: #111b21;
     word-wrap: break-word;
     white-space: pre-wrap;
+    unicode-bidi: plaintext;
 }
 
 .message-text a {
