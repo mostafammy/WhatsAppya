@@ -114,6 +114,8 @@ class MediaResolver:
             media_type = MediaType.STICKER
             if ext == '.was':
                 extra_data = self._extract_was_lottie(target_path)
+            elif ext == '.webp':
+                self._ensure_webp_infinite_loop(target_path)
         else:
             media_type = self._classify_extension(ext)
             if media_type == MediaType.AUDIO:
@@ -173,6 +175,24 @@ class MediaResolver:
         except Exception:
             pass
         return None
+
+    @staticmethod
+    def _ensure_webp_infinite_loop(path: Path) -> None:
+        """Ensures animated WebP stickers loop infinitely (loop_count=0) instead of stopping after 1 play."""
+        if not path.exists() or path.suffix.lower() != '.webp':
+            return
+        try:
+            with open(path, 'rb') as f:
+                data = bytearray(f.read())
+            anim_idx = data.find(b'ANIM')
+            if anim_idx != -1 and len(data) >= anim_idx + 14:
+                loop = int.from_bytes(data[anim_idx+12:anim_idx+14], 'little')
+                if loop != 0:
+                    data[anim_idx+12:anim_idx+14] = b'\x00\x00'
+                    with open(path, 'wb') as f:
+                        f.write(data)
+        except Exception:
+            pass
 
     def get_base64_data_uri(self, attachment: Attachment) -> str:
         """Embed local image file as Base64 URI if configured and valid."""
