@@ -1067,15 +1067,23 @@
         // 1. If Lottie vector animation (.was)
         const lottieDiv = containerEl.querySelector('.lottie-sticker');
         if (lottieDiv && lottieDiv._lottieAnim) {
-            lottieDiv._lottieAnim.goToAndPlay(0, true);
+            const anim = lottieDiv._lottieAnim;
+            const startFrame = anim.firstFrame !== undefined ? anim.firstFrame : 0;
+            anim.goToAndPlay(startFrame, true);
             return;
         }
 
         // 2. If Animated WebP image (.webp)
         const img = containerEl.querySelector('img');
         if (img && img.src) {
-            const baseSrc = img.src.split('#')[0];
-            img.src = baseSrc + '#' + Date.now();
+            try {
+                const url = new URL(img.src, window.location.href);
+                url.searchParams.set('replay', Date.now().toString());
+                img.src = url.href;
+            } catch (e) {
+                const baseSrc = img.src.split('?')[0];
+                img.src = baseSrc + '?replay=' + Date.now();
+            }
         }
     };
 
@@ -1087,7 +1095,7 @@
         if (typeof lottie === 'undefined') return;
 
         // Battery-Saving & CPU Viewport Observer
-        // Automatically pauses SVG rendering loops when offscreen, resumes when in view
+        // Generous 800px margin ensures animations are already smooth before scrolling into view
         let stickerObserver = null;
         if ('IntersectionObserver' in window) {
             stickerObserver = new IntersectionObserver((entries) => {
@@ -1100,7 +1108,7 @@
                         anim.pause();
                     }
                 });
-            }, { rootMargin: '100px 0px 100px 0px' });
+            }, { rootMargin: '800px 0px 800px 0px' });
         }
 
         const stickers = document.querySelectorAll('.lottie-sticker');
