@@ -1049,10 +1049,60 @@
     });
 
     /**
-     * Initializes Lottie vector animated stickers (.was).
+     * Replays animated stickers with Apple spring physics and haptic feedback.
+     */
+    window.replaySticker = function (containerEl) {
+        if (!containerEl) return;
+
+        // Tactile Haptic Feedback
+        if (navigator.vibrate) {
+            try { navigator.vibrate(10); } catch (_) {}
+        }
+
+        // Apple Spring Bounce class toggle
+        containerEl.classList.remove('sticker-bounce');
+        void containerEl.offsetWidth; // Force CSS reflow
+        containerEl.classList.add('sticker-bounce');
+
+        // 1. If Lottie vector animation (.was)
+        const lottieDiv = containerEl.querySelector('.lottie-sticker');
+        if (lottieDiv && lottieDiv._lottieAnim) {
+            lottieDiv._lottieAnim.goToAndPlay(0, true);
+            return;
+        }
+
+        // 2. If Animated WebP image (.webp)
+        const img = containerEl.querySelector('img');
+        if (img && img.src) {
+            const baseSrc = img.src.split('#')[0];
+            img.src = baseSrc + '#' + Date.now();
+        }
+    };
+
+    /**
+     * Initializes Lottie vector animated stickers (.was)
+     * with battery-saving viewport observer (pauses offscreen).
      */
     function initLottieStickers() {
         if (typeof lottie === 'undefined') return;
+
+        // Battery-Saving & CPU Viewport Observer
+        // Automatically pauses SVG rendering loops when offscreen, resumes when in view
+        let stickerObserver = null;
+        if ('IntersectionObserver' in window) {
+            stickerObserver = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    const anim = entry.target._lottieAnim;
+                    if (!anim) return;
+                    if (entry.isIntersecting) {
+                        anim.play();
+                    } else {
+                        anim.pause();
+                    }
+                });
+            }, { rootMargin: '100px 0px 100px 0px' });
+        }
+
         const stickers = document.querySelectorAll('.lottie-sticker');
         stickers.forEach(function (container) {
             const id = container.id;
@@ -1060,16 +1110,30 @@
             if (!scriptData) return;
             try {
                 const animData = JSON.parse(scriptData.textContent);
-                lottie.loadAnimation({
+                const anim = lottie.loadAnimation({
                     container: container,
                     renderer: 'svg',
                     loop: true,
                     autoplay: true,
                     animationData: animData
                 });
+                container._lottieAnim = anim;
+                if (stickerObserver) {
+                    stickerObserver.observe(container);
+                }
             } catch (err) {
                 console.error('Error hydrating sticker animation:', id, err);
             }
+        });
+
+        // Keyboard accessibility for sticker containers
+        document.querySelectorAll('.sticker-container').forEach(function (el) {
+            el.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    window.replaySticker(el);
+                }
+            });
         });
     }
 
