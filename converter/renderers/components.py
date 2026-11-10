@@ -99,15 +99,19 @@ class MediaCardComponent:
         cls._sticker_counter += 1
         safe_id = f"stk_{cls._sticker_counter}_{abs(hash(filename)) % 100000:05d}"
 
-        if attachment.extra_data:
+        if attachment.extra_data and attachment.extra_data.startswith('{'):
             escaped_json = attachment.extra_data.replace('</', r'<\/')
-            return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Animated Sticker" style="width: 140px; height: 140px;">
+            return f'''<div class="media-container sticker-container animated-sticker" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Animated Sticker" style="width: 140px; height: 140px;">
                 <div class="lottie-sticker" id="{safe_id}" style="width: 140px; height: 140px;"></div>
                 <script type="application/json" id="data_{safe_id}">{escaped_json}</script>
             </div>'''
 
         src = base64_uri if base64_uri else quote(filename)
-        return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Sticker" style="width: 140px; height: 140px;">
+        is_anim_webp = attachment.extra_data == 'animated_webp'
+        anim_class = " animated-sticker" if is_anim_webp else ""
+        title_text = "Tap to replay sticker animation" if is_anim_webp else "Sticker"
+        aria_label = "Animated Sticker" if is_anim_webp else "Sticker"
+        return f'''<div class="media-container sticker-container{anim_class}" onclick="replaySticker(this)" role="button" tabindex="0" title="{title_text}" aria-label="{aria_label}" style="width: 140px; height: 140px;">
             <img class="static-sticker" src="{src}" alt="{escape(filename)}" width="140" height="140" decoding="async">
         </div>'''
 
