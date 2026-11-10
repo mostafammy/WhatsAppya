@@ -1068,8 +1068,8 @@
         const lottieDiv = containerEl.querySelector('.lottie-sticker');
         if (lottieDiv && lottieDiv._lottieAnim) {
             const anim = lottieDiv._lottieAnim;
-            const startFrame = anim.firstFrame !== undefined ? anim.firstFrame : 0;
-            anim.goToAndPlay(startFrame, true);
+            anim.stop();
+            anim.play();
             return;
         }
 
