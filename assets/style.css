@@ -590,6 +590,8 @@ body {
 
 /* Sticker Container (Static .webp & Animated .was Lottie) */
 .sticker-container {
+    width: 140px;
+    height: 140px;
     margin: 4px 0 2px;
     display: flex;
     align-items: center;
@@ -601,6 +603,7 @@ body {
     -webkit-user-select: none;
     touch-action: manipulation;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: transform;
 }
 
 .sticker-container:active {
@@ -632,7 +635,8 @@ body {
     filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.12));
 }
 
-.sticker-container img.static-sticker {
+.sticker-container img.static-sticker,
+.sticker-container img {
     width: 140px;
     height: 140px;
     max-height: 140px;
@@ -645,6 +649,7 @@ body {
 }
 
 .sticker-container:hover img.static-sticker,
+.sticker-container:hover img,
 .sticker-container:hover .lottie-sticker svg {
     transform: scale(1.05);
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.18));
