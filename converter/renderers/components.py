@@ -83,6 +83,8 @@ class RichLinkComponent:
 class MediaCardComponent:
     """Renders images, videos, documents, and omitted media markers."""
 
+    _sticker_counter = 0
+
     @staticmethod
     def render_image(attachment: Attachment, base64_uri: str = "") -> str:
         filename = attachment.filename
@@ -91,20 +93,22 @@ class MediaCardComponent:
             <img src="{src}" alt="{escape(filename)}" onclick="openMedia(this.src, 'image')" loading="lazy">
         </div>'''
 
-    @staticmethod
-    def render_sticker(attachment: Attachment, base64_uri: str = "") -> str:
+    @classmethod
+    def render_sticker(cls, attachment: Attachment, base64_uri: str = "") -> str:
         filename = attachment.filename
+        cls._sticker_counter += 1
+        safe_id = f"stk_{cls._sticker_counter}_{abs(hash(filename)) % 100000:05d}"
+
         if attachment.extra_data:
-            safe_id = f"stk_{abs(hash(filename)) % 100000000:08d}"
             escaped_json = attachment.extra_data.replace('</', r'<\/')
-            return f'''<div class="media-container sticker-container">
+            return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Animated Sticker">
                 <div class="lottie-sticker" id="{safe_id}"></div>
                 <script type="application/json" id="data_{safe_id}">{escaped_json}</script>
             </div>'''
 
         src = base64_uri if base64_uri else quote(filename)
-        return f'''<div class="media-container sticker-container">
-            <img class="static-sticker" src="{src}" alt="{escape(filename)}" onclick="openMedia(this.src, 'image')" loading="lazy">
+        return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Sticker">
+            <img class="static-sticker" src="{src}" alt="{escape(filename)}" loading="lazy">
         </div>'''
 
     @staticmethod
