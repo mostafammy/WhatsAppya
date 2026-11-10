@@ -101,14 +101,14 @@ class MediaCardComponent:
 
         if attachment.extra_data:
             escaped_json = attachment.extra_data.replace('</', r'<\/')
-            return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Animated Sticker">
-                <div class="lottie-sticker" id="{safe_id}"></div>
+            return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Animated Sticker" style="width: 140px; height: 140px;">
+                <div class="lottie-sticker" id="{safe_id}" style="width: 140px; height: 140px;"></div>
                 <script type="application/json" id="data_{safe_id}">{escaped_json}</script>
             </div>'''
 
         src = base64_uri if base64_uri else quote(filename)
-        return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Sticker">
-            <img class="static-sticker" src="{src}" alt="{escape(filename)}" loading="lazy">
+        return f'''<div class="media-container sticker-container" onclick="replaySticker(this)" role="button" tabindex="0" title="Tap to replay sticker animation" aria-label="Sticker" style="width: 140px; height: 140px;">
+            <img class="static-sticker" src="{src}" alt="{escape(filename)}" width="140" height="140" decoding="async">
         </div>'''
 
     @staticmethod
