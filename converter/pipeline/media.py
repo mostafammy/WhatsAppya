@@ -115,7 +115,9 @@ class MediaResolver:
             if ext == '.was':
                 extra_data = self._extract_was_lottie(target_path)
             elif ext == '.webp':
-                self._ensure_webp_infinite_loop(target_path)
+                is_anim = self._ensure_webp_infinite_loop(target_path)
+                if is_anim:
+                    extra_data = 'animated_webp'
         else:
             media_type = self._classify_extension(ext)
             if media_type == MediaType.AUDIO:
@@ -177,22 +179,28 @@ class MediaResolver:
         return None
 
     @staticmethod
-    def _ensure_webp_infinite_loop(path: Path) -> None:
-        """Ensures animated WebP stickers loop infinitely (loop_count=0) instead of stopping after 1 play."""
+    def _ensure_webp_infinite_loop(path: Path) -> bool:
+        """Ensures animated WebP stickers loop infinitely (loop_count=0) and returns True if animated."""
         if not path.exists() or path.suffix.lower() != '.webp':
-            return
+            return False
         try:
             with open(path, 'rb') as f:
                 data = bytearray(f.read())
+            is_anim = False
+            if len(data) > 20 and data[12:16] == b'VP8X' and (data[20] & 0x02):
+                is_anim = True
             anim_idx = data.find(b'ANIM')
-            if anim_idx != -1 and len(data) >= anim_idx + 14:
-                loop = int.from_bytes(data[anim_idx+12:anim_idx+14], 'little')
-                if loop != 0:
-                    data[anim_idx+12:anim_idx+14] = b'\x00\x00'
-                    with open(path, 'wb') as f:
-                        f.write(data)
+            if anim_idx != -1:
+                is_anim = True
+                if len(data) >= anim_idx + 14:
+                    loop = int.from_bytes(data[anim_idx+12:anim_idx+14], 'little')
+                    if loop != 0:
+                        data[anim_idx+12:anim_idx+14] = b'\x00\x00'
+                        with open(path, 'wb') as f:
+                            f.write(data)
+            return is_anim
         except Exception:
-            pass
+            return False
 
     def get_base64_data_uri(self, attachment: Attachment) -> str:
         """Embed local image file as Base64 URI if configured and valid."""
