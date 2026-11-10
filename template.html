@@ -9,17 +9,20 @@
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <h1 dir="auto">{chat_name}</h1>
-            <div class="subtitle">{message_count} messages</div>
+            <div class="header-avatar" aria-hidden="true">💬</div>
+            <div class="header-info">
+                <h1 dir="auto">{chat_name}</h1>
+                <div class="subtitle">{message_count} messages</div>
+            </div>
         </div>
         <div class="messages-container">
             {messages}
         </div>
     </div>
 
-    <!-- Modal for viewing media -->
-    <div id="mediaModal" class="modal" onclick="closeModal()">
-        <span class="modal-close">&times;</span>
+    <!-- Lightbox Modal for Fullscreen Media Viewing -->
+    <div id="mediaModal" class="modal" onclick="closeModal()" role="dialog" aria-modal="true">
+        <span class="modal-close" aria-label="Close Preview">&times;</span>
         <div class="modal-content" id="modalContent"></div>
     </div>
 
