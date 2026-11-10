@@ -166,8 +166,12 @@ class ChatConverterService:
             if item.is_file():
                 dest_file = destination / item.name
                 if dest_file.exists() and dest_file.stat().st_size == item.stat().st_size:
+                    if dest_file.suffix.lower() == '.webp':
+                        MediaResolver._ensure_webp_infinite_loop(dest_file)
                     continue
                 shutil.copy2(item, dest_file)
+                if dest_file.suffix.lower() == '.webp':
+                    MediaResolver._ensure_webp_infinite_loop(dest_file)
             elif item.is_dir():
                 dest_subdir = destination / item.name
                 shutil.copytree(
