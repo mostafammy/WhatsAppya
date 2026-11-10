@@ -1088,28 +1088,11 @@
     };
 
     /**
-     * Initializes Lottie vector animated stickers (.was)
-     * with battery-saving viewport observer (pauses offscreen).
+     * Initializes Lottie vector animated stickers (.was).
+     * Plays continuously in an infinite loop without pausing bugs.
      */
     function initLottieStickers() {
         if (typeof lottie === 'undefined') return;
-
-        // Battery-Saving & CPU Viewport Observer
-        // Generous 800px margin ensures animations are already smooth before scrolling into view
-        let stickerObserver = null;
-        if ('IntersectionObserver' in window) {
-            stickerObserver = new IntersectionObserver((entries) => {
-                entries.forEach((entry) => {
-                    const anim = entry.target._lottieAnim;
-                    if (!anim) return;
-                    if (entry.isIntersecting) {
-                        anim.play();
-                    } else {
-                        anim.pause();
-                    }
-                });
-            }, { rootMargin: '800px 0px 800px 0px' });
-        }
 
         const stickers = document.querySelectorAll('.lottie-sticker');
         stickers.forEach(function (container) {
@@ -1126,9 +1109,7 @@
                     animationData: animData
                 });
                 container._lottieAnim = anim;
-                if (stickerObserver) {
-                    stickerObserver.observe(container);
-                }
+                anim.play();
             } catch (err) {
                 console.error('Error hydrating sticker animation:', id, err);
             }
@@ -1147,9 +1128,18 @@
 
     // Initialize all components once DOM is ready
     function initAll() {
-        const players = document.querySelectorAll('.apple-voice-player');
-        players.forEach(initVoicePlayer);
-        initLottieStickers();
+        try {
+            const players = document.querySelectorAll('.apple-voice-player');
+            players.forEach(initVoicePlayer);
+        } catch (err) {
+            console.error('Voice player initialization error:', err);
+        }
+
+        try {
+            initLottieStickers();
+        } catch (err) {
+            console.error('Lottie initialization error:', err);
+        }
     }
 
     if (document.readyState === 'loading') {
