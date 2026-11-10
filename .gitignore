@@ -1,6 +1,8 @@
 # Personal WhatsApp Chats & Sensitive Data
 WhatsAppChat/
 result/
+dist/
+*_export/
 *.zip
 *.opus
 *.mp4
