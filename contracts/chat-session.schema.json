@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://whatsappya.app/schemas/chat-session.v1.json",
+  "title": "ChatSession v1",
+  "description": "Cross-language contract. TypeScript (packages/core) and Swift (WhatsAppyaCore) MUST both produce output that validates against this schema and matches fixtures/golden.",
+  "type": "object",
+  "required": ["schemaVersion", "title", "contactName", "ownerName", "messages"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "title": { "type": "string" },
+    "contactName": { "type": "string" },
+    "ownerName": { "type": ["string", "null"] },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rawDate", "rawTime", "sender", "text", "kind", "direction"],
+        "properties": {
+          "id": { "type": "string" },
+          "rawDate": { "type": "string" },
+          "rawTime": { "type": "string" },
+          "timestamp": { "type": ["string", "null"], "format": "date-time" },
+          "sender": { "type": ["string", "null"] },
+          "text": { "type": "string" },
+          "kind": { "enum": ["message", "system", "call"] },
+          "direction": { "enum": ["sent", "received"] },
+          "isDeleted": { "type": "boolean" },
+          "isEdited": { "type": "boolean" },
+          "attachment": {
+            "type": ["object", "null"],
+            "required": ["fileName", "kind", "mimeType", "sizeBytes", "isOmitted"],
+            "properties": {
+              "fileName": { "type": "string" },
+              "kind": {
+                "enum": [
+                  "none",
+                  "image",
+                  "video",
+                  "audio",
+                  "pdf",
+                  "document",
+                  "file",
+                  "sticker",
+                  "omitted"
+                ]
+              },
+              "mimeType": { "type": "string" },
+              "sizeBytes": { "type": "integer", "minimum": 0 },
+              "isOmitted": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

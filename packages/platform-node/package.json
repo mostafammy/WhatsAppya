@@ -1,0 +1,15 @@
+{
+  "name": "@whatsappya/platform-node",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Node adapters for core ports (used by the CLI and golden-file tests).",
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": { "@types/node": "^22.10.0" },
+  "dependencies": { "@whatsappya/core": "workspace:*", "fflate": "^0.8.2" }
+}

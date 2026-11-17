@@ -1,0 +1,31 @@
+# XcodeGen spec — the .xcodeproj is GENERATED (git-ignored). Run: `xcodegen generate`
+name: WhatsAppya
+options:
+  bundleIdPrefix: app.whatsappya
+  deploymentTarget: { iOS: "17.0" }
+packages:
+  WhatsAppyaKit: { path: Packages/WhatsAppyaKit }
+targets:
+  WhatsAppya:
+    type: application
+    platform: iOS
+    sources: [WhatsAppya]
+    dependencies:
+      - package: WhatsAppyaKit
+        products: [WhatsAppyaCore, WhatsAppyaUI]
+      - target: ShareExtension
+    entitlements:
+      path: WhatsAppya/Resources/WhatsAppya.entitlements
+      properties:
+        com.apple.security.application-groups: [group.app.whatsappya]
+  ShareExtension:
+    type: app-extension
+    platform: iOS
+    sources: [ShareExtension]
+    dependencies:
+      - package: WhatsAppyaKit
+        products: [WhatsAppyaCore]
+    entitlements:
+      path: ShareExtension/ShareExtension.entitlements
+      properties:
+        com.apple.security.application-groups: [group.app.whatsappya]

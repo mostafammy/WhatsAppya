@@ -1,0 +1,4 @@
+{
+  "spring": { "stiffness": 300, "damping": 22 },
+  "duration": { "fast": 150, "base": 250, "slow": 400 }
+}

@@ -1,0 +1,12 @@
+:root {
+  --wa-bubble-sent: #DCF8C6;
+  --wa-bubble-received: #FFFFFF;
+  --wa-accent: #007AFF;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+  --wa-bubble-sent: #005C4B;
+  --wa-bubble-received: #202C33;
+  --wa-accent: #0A84FF;
+  }
+}

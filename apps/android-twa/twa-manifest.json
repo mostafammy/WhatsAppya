@@ -1,0 +1,17 @@
+{
+  "packageId": "app.whatsappya.twa",
+  "host": "whatsappya.app",
+  "name": "WhatsAppya",
+  "launcherName": "WhatsAppya",
+  "startUrl": "/",
+  "display": "standalone",
+  "themeColor": "#000000",
+  "backgroundColor": "#000000",
+  "enableNotifications": false,
+  "shareTarget": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": { "files": [{ "name": "export", "accept": ["application/zip", ".zip"] }] }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@whatsappya/platform-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser adapters for core ports: zip (fflate), File System Access, Web Share Target, OPFS.",
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": { "@whatsappya/core": "workspace:*", "fflate": "^0.8.2" }
+}

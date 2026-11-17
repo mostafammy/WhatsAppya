@@ -1,0 +1,14 @@
+{
+  "name": "@whatsappya/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure, platform-agnostic domain + parsing engine. No DOM, no Node APIs, zero runtime deps.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

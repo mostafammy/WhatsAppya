@@ -1,0 +1,14 @@
+{
+  "name": "@whatsappya/viewer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Framework-free Web Components chat viewer (virtualized list, voice notes, stickers, lightbox).",
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": { "@whatsappya/core": "workspace:*" }
+}

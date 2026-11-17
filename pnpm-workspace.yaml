@@ -1,0 +1,9 @@
+packages:
+  - "apps/web"
+  - "apps/cli"
+  - "packages/*"
+
+# Supply-chain safety: only these deps may run install scripts
+allowBuilds:
+  esbuild: true
+  "@biomejs/biome": true

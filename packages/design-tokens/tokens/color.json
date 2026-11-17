@@ -1,0 +1,7 @@
+{
+  "bubble": {
+    "sent": { "light": "#DCF8C6", "dark": "#005C4B" },
+    "received": { "light": "#FFFFFF", "dark": "#202C33" }
+  },
+  "accent": { "light": "#007AFF", "dark": "#0A84FF" }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@whatsappya/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Single source of truth for colour, type, spacing and motion. Generates CSS variables (web) and Swift (iOS).",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "echo 'no ts'",
+    "test": "echo 'no tests'"
+  }
+}

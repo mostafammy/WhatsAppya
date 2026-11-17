@@ -1,0 +1,19 @@
+{
+  "name": "@whatsappya/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Power-user CLI (replaces main.py). Same core as the web app.",
+  "type": "module",
+  "bin": { "whatsappya": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@whatsappya/core": "workspace:*",
+    "@whatsappya/exporter": "workspace:*",
+    "@whatsappya/platform-node": "workspace:*"
+  },
+  "devDependencies": { "@types/node": "^22.10.0" }
+}
