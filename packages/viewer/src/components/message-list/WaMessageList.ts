@@ -8,12 +8,33 @@ import { FenwickTree } from "./FenwickTree.js";
 
 const OVERSCAN = 8;
 const DEFAULT_ROW_HEIGHT = 76;
+const MAX_CSS_HEIGHT = 10_000_000;
+
+export type RowArchetype = "text" | "audio" | "media" | "sticker" | "system";
+
+function classifyArchetype(msg: ChatMessage): RowArchetype {
+  if (msg.kind === "system" || msg.kind === "call") return "system";
+  const att = msg.attachment;
+  if (!att || att.isOmitted || att.kind === "omitted") return "text";
+  if (att.kind === "audio") return "audio";
+  if (att.kind === "sticker") return "sticker";
+  if (att.kind === "image" || att.kind === "video") return "media";
+  return "text";
+}
+
+interface ActiveRowEntry {
+  readonly el: HTMLDivElement;
+  readonly archetype: RowArchetype;
+}
 
 /**
  * `<wa-message-list>`
- * High-performance virtualized chat list for 50,000+ messages.
- * Uses a FenwickTree for O(log N) variable-height scroll offsets, typed DOM recycling,
- * and a single-rAF batched ResizeObserver (zero forced synchronous reflows).
+ * High-performance virtualized chat list for 50,000+ (and >150,000) messages.
+ * - FenwickTree for O(log N) variable-height scroll offsets & binary search.
+ * - Archetype-typed DOM pools (`text`, `audio`, `media`, `sticker`, `system`) with CSS containment.
+ * - Single-rAF batched ResizeObserver with above-viewport scroll-jump compensation.
+ * - External sticky date-header overlay pill (works cleanly inside translate3d virtualization).
+ * - Automatic virtual coordinate scaling above 10,000,000 px.
  */
 export class WaMessageList extends HTMLElement {
   #session: ChatSession | null = null;
@@ -23,14 +44,22 @@ export class WaMessageList extends HTMLElement {
 
   #scroller: HTMLDivElement;
   #canvas: HTMLDivElement;
-  #activeRows = new Map<number, HTMLDivElement>();
-  #freePool: HTMLDivElement[] = [];
+  #stickyDate: HTMLDivElement;
+  #activeRows = new Map<number, ActiveRowEntry>();
+  #pools = new Map<RowArchetype, HTMLDivElement[]>([
+    ["text", []],
+    ["audio", []],
+    ["media", []],
+    ["sticker", []],
+    ["system", []],
+  ]);
   #rowIndexLookup = new WeakMap<Element, number>();
   #pendingHeights = new Map<number, number>();
   #resizeObserver: ResizeObserver | null = null;
   #rafId = 0;
   #measureRafId = 0;
   #highlightedId: string | null = null;
+  #scale = 1;
 
   constructor() {
     super();
@@ -46,6 +75,27 @@ export class WaMessageList extends HTMLElement {
           background: var(--wa-canvas);
           overflow: hidden;
         }
+        .sticky-date {
+          position: absolute;
+          top: 10px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 5;
+          pointer-events: none;
+          background: var(--wa-system-bg);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: var(--wa-text-secondary);
+          font-size: 11.5px;
+          font-weight: 600;
+          padding: 4px 12px;
+          border-radius: 999px;
+          box-shadow: var(--wa-shadow-sm);
+          border: 1px solid var(--wa-border);
+          opacity: 0;
+          transition: opacity var(--wa-duration-fast) var(--wa-spring);
+        }
+        .sticky-date.visible { opacity: 1; }
         .scroller {
           height: 100%;
           width: 100%;
@@ -69,6 +119,7 @@ export class WaMessageList extends HTMLElement {
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
+          contain: layout style;
           will-change: transform;
         }
         .row.sent { align-items: flex-end; }
@@ -162,6 +213,7 @@ export class WaMessageList extends HTMLElement {
           color: var(--wa-text-secondary);
         }
       </style>
+      <div class="sticky-date" aria-hidden="true"></div>
       <div class="scroller" role="log" aria-label="Chat messages">
         <div class="canvas"></div>
       </div>
@@ -169,9 +221,11 @@ export class WaMessageList extends HTMLElement {
 
     const scroller = shadow.querySelector<HTMLDivElement>(".scroller");
     const canvas = shadow.querySelector<HTMLDivElement>(".canvas");
-    if (!scroller || !canvas) throw new Error("WaMessageList shadow DOM failed");
+    const stickyDate = shadow.querySelector<HTMLDivElement>(".sticky-date");
+    if (!scroller || !canvas || !stickyDate) throw new Error("WaMessageList shadow DOM failed");
     this.#scroller = scroller;
     this.#canvas = canvas;
+    this.#stickyDate = stickyDate;
 
     this.#scroller.addEventListener("scroll", () => this.#scheduleRender(), { passive: true });
 
@@ -210,6 +264,10 @@ export class WaMessageList extends HTMLElement {
     return this.#computeRange();
   }
 
+  get mountedRowCount(): number {
+    return this.#activeRows.size;
+  }
+
   disconnectedCallback(): void {
     if (this.#rafId) cancelAnimationFrame(this.#rafId);
     if (this.#measureRafId) cancelAnimationFrame(this.#measureRafId);
@@ -224,25 +282,32 @@ export class WaMessageList extends HTMLElement {
 
     const msg = this.#messages[idx];
     this.#highlightedId = msg?.id ?? null;
-    const top = this.#tree.prefixSum(idx);
-    this.#scroller.scrollTop = Math.max(0, top - 64);
+    const virtualTop = this.#tree.prefixSum(idx);
+    this.#scroller.scrollTop = Math.max(0, Math.round(virtualTop * this.#scale) - 64);
     this.#render();
+  }
+
+  #updateCanvasHeight(): void {
+    const total = this.#tree.totalHeight();
+    this.#scale = total > MAX_CSS_HEIGHT ? MAX_CSS_HEIGHT / total : 1;
+    const cssHeight = Math.min(total, MAX_CSS_HEIGHT);
+    this.#canvas.style.height = `${cssHeight}px`;
   }
 
   #resetVirtualState(): void {
     this.#clearActiveRows();
     this.#pendingHeights.clear();
     this.#tree = new FenwickTree(this.#messages.length, DEFAULT_ROW_HEIGHT);
-    this.#canvas.style.height = `${this.#tree.totalHeight()}px`;
+    this.#updateCanvasHeight();
     this.#scroller.scrollTop = 0;
     this.#render();
   }
 
   #clearActiveRows(): void {
-    for (const row of this.#activeRows.values()) {
-      this.#resizeObserver?.unobserve(row);
-      row.remove();
-      this.#freePool.push(row);
+    for (const entry of this.#activeRows.values()) {
+      this.#resizeObserver?.unobserve(entry.el);
+      entry.el.remove();
+      this.#pools.get(entry.archetype)?.push(entry.el);
     }
     this.#activeRows.clear();
   }
@@ -255,31 +320,41 @@ export class WaMessageList extends HTMLElement {
     });
   }
 
-  #computeRange(): { start: number; end: number } {
+  #computeRange(): { start: number; end: number; firstVisible: number } {
     const total = this.#messages.length;
-    if (total === 0) return { start: 0, end: -1 };
+    if (total === 0) return { start: 0, end: -1, firstVisible: -1 };
 
-    const scrollTop = this.#scroller.scrollTop;
-    const viewport = this.#scroller.clientHeight || 800;
+    const virtualTop = this.#scroller.scrollTop / this.#scale;
+    const viewport = (this.#scroller.clientHeight || 800) / this.#scale;
 
-    const firstVisible = this.#tree.findIndexByOffset(scrollTop);
-    const lastVisible = this.#tree.findIndexByOffset(scrollTop + viewport);
+    const firstVisible = this.#tree.findIndexByOffset(virtualTop);
+    const lastVisible = this.#tree.findIndexByOffset(virtualTop + viewport);
 
     return {
       start: Math.max(0, firstVisible - OVERSCAN),
       end: Math.min(total - 1, lastVisible + OVERSCAN),
+      firstVisible,
     };
   }
 
   #render(): void {
-    const { start, end } = this.#computeRange();
+    const { start, end, firstVisible } = this.#computeRange();
 
-    // Recycle rows outside visible window
-    for (const [idx, row] of this.#activeRows) {
+    // Update external sticky date overlay pill
+    const topMsg = firstVisible >= 0 ? this.#messages[firstVisible] : undefined;
+    if (topMsg?.rawDate) {
+      this.#stickyDate.textContent = topMsg.rawDate;
+      this.#stickyDate.classList.add("visible");
+    } else {
+      this.#stickyDate.classList.remove("visible");
+    }
+
+    // Recycle rows outside visible window back into their exact archetype pool
+    for (const [idx, entry] of this.#activeRows) {
       if (idx < start || idx > end) {
-        this.#resizeObserver?.unobserve(row);
-        row.remove();
-        this.#freePool.push(row);
+        this.#resizeObserver?.unobserve(entry.el);
+        entry.el.remove();
+        this.#pools.get(entry.archetype)?.push(entry.el);
         this.#activeRows.delete(idx);
       }
     }
@@ -288,19 +363,24 @@ export class WaMessageList extends HTMLElement {
 
     const fragment = document.createDocumentFragment();
     for (let i = start; i <= end; i++) {
-      let row = this.#activeRows.get(i);
-      if (!row) {
-        row = this.#freePool.pop() ?? document.createElement("div");
-        this.#populateRow(row, i);
-        this.#activeRows.set(i, row);
+      let active = this.#activeRows.get(i);
+      const msg = this.#messages[i];
+      if (!msg) continue;
+
+      if (!active) {
+        const archetype = classifyArchetype(msg);
+        const row = this.#pools.get(archetype)?.pop() ?? document.createElement("div");
+        this.#populateRow(row, msg, i);
+        active = { el: row, archetype };
+        this.#activeRows.set(i, active);
         this.#rowIndexLookup.set(row, i);
         this.#resizeObserver?.observe(row);
         fragment.appendChild(row);
       }
-      const y = this.#tree.prefixSum(i);
-      row.style.transform = `translate3d(0, ${y}px, 0)`;
-      const msg = this.#messages[i];
-      row.classList.toggle("highlighted", Boolean(msg && msg.id === this.#highlightedId));
+
+      const y = Math.round(this.#tree.prefixSum(i) * this.#scale);
+      active.el.style.transform = `translate3d(0, ${y}px, 0)`;
+      active.el.classList.toggle("highlighted", msg.id === this.#highlightedId);
     }
 
     if (fragment.childNodes.length > 0) {
@@ -310,28 +390,40 @@ export class WaMessageList extends HTMLElement {
 
   #flushMeasuredHeights(): void {
     this.#measureRafId = 0;
+    const prevScrollTop = this.#scroller.scrollTop;
+    const firstVisible = this.#tree.findIndexByOffset(prevScrollTop / this.#scale);
+
     let changed = false;
+    let deltaAboveViewport = 0;
+
     for (const [idx, h] of this.#pendingHeights) {
-      if (Math.abs(this.#tree.getHeight(idx) - h) >= 1) {
+      const prevH = this.#tree.getHeight(idx);
+      const delta = h - prevH;
+      if (Math.abs(delta) >= 1) {
         this.#tree.update(idx, h);
         changed = true;
+        if (idx < firstVisible) {
+          deltaAboveViewport += delta;
+        }
       }
     }
     this.#pendingHeights.clear();
+
     if (changed) {
-      this.#canvas.style.height = `${this.#tree.totalHeight()}px`;
-      for (const [idx, row] of this.#activeRows) {
-        row.style.transform = `translate3d(0, ${this.#tree.prefixSum(idx)}px, 0)`;
+      this.#updateCanvasHeight();
+      if (deltaAboveViewport !== 0 && prevScrollTop > 0) {
+        this.#scroller.scrollTop = Math.max(0, prevScrollTop + deltaAboveViewport * this.#scale);
+      }
+      for (const [idx, entry] of this.#activeRows) {
+        const y = Math.round(this.#tree.prefixSum(idx) * this.#scale);
+        entry.el.style.transform = `translate3d(0, ${y}px, 0)`;
       }
     }
   }
 
-  #populateRow(row: HTMLDivElement, index: number): void {
-    const msg = this.#messages[index];
+  #populateRow(row: HTMLDivElement, msg: ChatMessage, index: number): void {
     row.innerHTML = "";
     row.className = "row";
-    if (!msg) return;
-
     row.dataset.index = String(index);
     row.dataset.id = msg.id;
 

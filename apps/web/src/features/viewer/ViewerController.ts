@@ -20,6 +20,7 @@ import {
 } from "@whatsappya/viewer";
 import { STANDALONE_VIEWER_CSS, STANDALONE_VIEWER_JS } from "@whatsappya/viewer/standalone";
 import { createConvertChat } from "../../app/container.js";
+import { openStatsModal } from "../stats/StatsModal.js";
 import { SearchWorkerClient } from "./SearchWorkerClient.js";
 
 /**
@@ -47,7 +48,8 @@ export class ViewerController {
       <style>
         .shell{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
         .topbar-actions{display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid rgba(0,0,0,.08);background:var(--wa-surface,#fff);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px}
-        .export-btn{margin-left:auto;border:none;background:#007AFF;color:#fff;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer}
+        .stats-btn{margin-left:auto;border:1px solid rgba(0,0,0,.15);background:transparent;border-radius:8px;padding:5px 10px;font-weight:600;cursor:pointer}
+        .export-btn{border:none;background:#007AFF;color:#fff;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer}
         .reset-btn{border:1px solid rgba(0,0,0,.15);background:transparent;border-radius:8px;padding:5px 10px;cursor:pointer}
         wa-split-view{flex:1;min-height:0}
         .chat-pane{display:flex;flex-direction:column;height:100%;min-height:0}
@@ -57,6 +59,7 @@ export class ViewerController {
         <div class="topbar-actions">
           <button class="reset-btn" type="button">← New Export</button>
           <span class="archive-title"></span>
+          <button class="stats-btn" type="button">Insights</button>
           <button class="export-btn" type="button">Export Offline HTML</button>
         </div>
         <wa-split-view>
@@ -128,6 +131,9 @@ export class ViewerController {
       void this.#lightbox.open(item);
     });
 
+    this.root.querySelector(".stats-btn")?.addEventListener("click", () => {
+      if (this.#activeSession) openStatsModal(this.#activeSession);
+    });
     this.root.querySelector(".export-btn")?.addEventListener("click", () => this.#exportHtml());
     this.root.querySelector(".reset-btn")?.addEventListener("click", () => {
       this.#searchClient.dispose();

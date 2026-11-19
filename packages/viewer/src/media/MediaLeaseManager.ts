@@ -1,3 +1,5 @@
+import { patchWebpInfiniteLoop } from "@whatsappya/core";
+
 /**
  * Platform-agnostic resolver for attachment playback/display URLs.
  * Web app wires this to ZipFileSource/OPFS; HTML exports resolve relative paths.
@@ -111,8 +113,17 @@ export class MediaLeaseManager {
       return resolved;
     }
 
-    const url = URL.createObjectURL(resolved);
-    const sizeBytes = resolved.size;
+    let finalBlob = resolved;
+    if (mimeType === "image/webp" && resolved.size > 20 && resolved.size <= 2 * 1024 * 1024) {
+      const rawBytes = new Uint8Array(await resolved.arrayBuffer());
+      const patched = patchWebpInfiniteLoop(rawBytes);
+      if (patched.bytes !== rawBytes) {
+        finalBlob = new Blob([patched.bytes as unknown as BlobPart], { type: mimeType });
+      }
+    }
+
+    const url = URL.createObjectURL(finalBlob);
+    const sizeBytes = finalBlob.size;
     this.#currentBytes += sizeBytes;
     this.#entries.set(fileName, {
       key: fileName,

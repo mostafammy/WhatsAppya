@@ -74,5 +74,33 @@ struct WhatsAppyaGoldenVerifier {
         try assertEqual(androidActual.senderCounts, androidGolden.senderCounts, "android.senderCounts")
         try assertEqual(androidActual.messages, androidGolden.messages, "android.messages")
         print("✓ Swift parity passed: android-ar-24h (\(androidActual.messages.count) messages)")
+
+        // 3. ZipFileSource end-to-end test (DEFLATE + STORE via macOS /usr/bin/zip)
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wa-swift-zip-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let chatDir = tmpDir.appendingPathComponent("WhatsApp Chat - Alex", isDirectory: true)
+        try FileManager.default.createDirectory(at: chatDir, withIntermediateDirectories: true)
+        try iosExport.write(to: chatDir.appendingPathComponent("_chat.txt"))
+        try Data("MOCK IMAGE BYTES".utf8).write(
+            to: chatDir.appendingPathComponent("00000001-PHOTO-2026-11-17-09-16-05.jpg")
+        )
+
+        let zipURL = tmpDir.appendingPathComponent("export.zip")
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        proc.currentDirectoryURL = tmpDir
+        proc.arguments = ["-r", "-q", zipURL.path, "WhatsApp Chat - Alex"]
+        try proc.run()
+        proc.waitUntilExit()
+        try assertEqual(proc.terminationStatus, 0, "zip exit status")
+
+        let zipSource = try ZipFileSource(fileURL: zipURL)
+        let zipSession = try await ConvertChat().execute(files: zipSource)
+        try assertEqual(zipSession.contactName, iosGolden.contactName, "zip.contactName")
+        try assertEqual(zipSession.messages, iosGolden.messages, "zip.messages")
+        print("✓ Swift ZipFileSource passed: \(zipSession.messages.count) messages read directly from ZIP")
     }
 }

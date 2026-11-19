@@ -12,6 +12,7 @@ export {
 } from "./search/HybridSearchIndex.js";
 export * from "./shared/result.js";
 export * from "./shared/parserRules.js";
+export * from "./shared/mediaBinary.js";
 export type * from "./ports/FileSource.js";
 export * from "./ports/Logger.js";
 export type * from "./parsers/ChatParser.js";
@@ -29,3 +30,4 @@ export { DirectionStage, resolveParticipants } from "./pipeline/stages/Direction
 export { LinkStage } from "./pipeline/stages/LinkStage.js";
 export * from "./application/ConvertChat.js";
 export * from "./application/ConvertArchive.js";
+export * from "./application/ComputeChatStats.js";

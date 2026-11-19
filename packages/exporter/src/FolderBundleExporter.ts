@@ -1,4 +1,9 @@
-import type { ChatSession, FileSource } from "@whatsappya/core";
+import {
+  type ChatMessage,
+  type ChatSession,
+  type FileSource,
+  parseOggOpusDuration,
+} from "@whatsappya/core";
 import { type ExportAssets, StandaloneHtmlExporter, escapeHtml } from "./StandaloneHtmlExporter.js";
 
 export interface BundleOutputFile {
@@ -34,17 +39,28 @@ export class FolderBundleExporter {
     const htmlFilename = options.htmlFilename ?? "chat.html";
     const outputs: BundleOutputFile[] = [];
     const voiceCacheScripts: string[] = [];
+    const enrichedMessages: ChatMessage[] = [...session.messages];
+    const seenAudio = new Set<string>();
 
-    if (options.legacyVoiceCache) {
-      const seenAudio = new Set<string>();
-      for (const msg of session.messages) {
-        const att = msg.attachment;
-        if (!att || att.isOmitted || att.kind !== "audio" || seenAudio.has(att.fileName)) {
-          continue;
+    for (let i = 0; i < enrichedMessages.length; i++) {
+      const msg = enrichedMessages[i];
+      const att = msg?.attachment;
+      if (!msg || !att || att.isOmitted || att.kind !== "audio") continue;
+
+      try {
+        const bytes = await files.readBytes(att.fileName);
+        if (att.durationSeconds === undefined) {
+          const parsedDuration = parseOggOpusDuration(bytes);
+          if (parsedDuration !== undefined) {
+            enrichedMessages[i] = {
+              ...msg,
+              attachment: { ...att, durationSeconds: parsedDuration },
+            };
+          }
         }
-        seenAudio.add(att.fileName);
-        try {
-          const bytes = await files.readBytes(att.fileName);
+
+        if (options.legacyVoiceCache && !seenAudio.has(att.fileName)) {
+          seenAudio.add(att.fileName);
           const b64 = uint8ToBase64(bytes);
           const encodedKey = encodeURIComponent(att.fileName);
           const jsPayload = `window.__WA_VOICE_CACHE__=window.__WA_VOICE_CACHE__||{};window.__WA_VOICE_CACHE__[${JSON.stringify(encodedKey)}]=${JSON.stringify(b64)};\n`;
@@ -54,13 +70,14 @@ export class FolderBundleExporter {
             relativePath: `${options.folderName}/${scriptRelPath}`,
             content: jsPayload,
           });
-        } catch {
-          // Skip missing audio files cleanly
         }
+      } catch {
+        // Skip missing audio files cleanly
       }
     }
 
-    const html = this.#htmlExporter.build(session, {
+    const enrichedSession: ChatSession = { ...session, messages: enrichedMessages };
+    const html = this.#htmlExporter.build(enrichedSession, {
       legacyVoiceCacheScripts: voiceCacheScripts,
     });
     outputs.push({

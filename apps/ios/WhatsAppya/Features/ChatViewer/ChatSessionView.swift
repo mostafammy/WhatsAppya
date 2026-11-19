@@ -5,6 +5,7 @@ import WhatsAppyaCore
 struct ChatSessionView: View {
     let session: ChatSession
     @State private var searchQuery = ""
+    @State private var isStatsPresented = false
 
     private var filteredMessages: [ChatMessage] {
         guard !searchQuery.isEmpty else { return session.messages }
@@ -27,6 +28,19 @@ struct ChatSessionView: View {
         .navigationTitle(session.contactName)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchQuery, prompt: "Search messages")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isStatsPresented = true
+                } label: {
+                    Image(systemName: "chart.bar.xaxis")
+                }
+                .accessibilityLabel("Chat Insights")
+            }
+        }
+        .sheet(isPresented: $isStatsPresented) {
+            ChatStatsView(session: session)
+        }
     }
 }
 

@@ -30,7 +30,7 @@ struct ImportView: View {
         .padding()
         .fileImporter(
             isPresented: $isPickerPresented,
-            allowedContentTypes: [.folder, .plainText],
+            allowedContentTypes: [.zip, .folder, .plainText],
             allowsMultipleSelection: false
         ) { result in
             switch result {
@@ -52,11 +52,19 @@ struct ImportView: View {
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
         do {
-            let folderURL = url.hasDirectoryPath ? url : url.deletingLastPathComponent()
-            let source = DirectoryFileSource(rootURL: folderURL)
+            let source: any FileSource
+            let rootName: String
+            if url.pathExtension.lowercased() == "zip" {
+                source = try ZipFileSource(fileURL: url)
+                rootName = url.deletingPathExtension().lastPathComponent
+            } else {
+                let folderURL = url.hasDirectoryPath ? url : url.deletingLastPathComponent()
+                source = DirectoryFileSource(rootURL: folderURL)
+                rootName = folderURL.lastPathComponent
+            }
             let tree = try await ConvertArchive().execute(
                 files: source,
-                rootName: folderURL.lastPathComponent
+                rootName: rootName
             )
             let firstPath = tree.root.chats.first?.path
             let session = try await ConvertChat().execute(files: source, chatPath: firstPath)
