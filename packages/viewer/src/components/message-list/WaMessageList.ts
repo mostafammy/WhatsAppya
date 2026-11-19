@@ -18,6 +18,13 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
+const TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+  timeZone: "UTC",
+});
+
 function formatDateLabel(msg: ChatMessage): string {
   if (msg.timestamp) {
     const dt = new Date(msg.timestamp);
@@ -26,6 +33,22 @@ function formatDateLabel(msg: ChatMessage): string {
     }
   }
   return msg.rawDate;
+}
+
+function formatTimeLabel(msg: ChatMessage): string {
+  if (msg.timestamp) {
+    const dt = new Date(msg.timestamp);
+    if (!Number.isNaN(dt.getTime())) {
+      return TIME_FORMATTER.format(dt);
+    }
+  }
+  return msg.rawTime
+    .replace(/\u00a0/g, " ")
+    .replace(/^(\d{1,2}:\d{2}):\d{2}/, "$1")
+    .replace(/ص/g, "AM")
+    .replace(/م/g, "PM")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getDateKey(msg: ChatMessage | undefined): string {
@@ -573,7 +596,8 @@ export class WaMessageList extends HTMLElement {
 
     const meta = document.createElement("div");
     meta.className = "meta";
-    meta.textContent = msg.isEdited ? `Edited · ${msg.rawTime}` : msg.rawTime;
+    const timeLabel = formatTimeLabel(msg);
+    meta.textContent = msg.isEdited ? `Edited · ${timeLabel}` : timeLabel;
     bubble.appendChild(meta);
 
     row.appendChild(bubble);

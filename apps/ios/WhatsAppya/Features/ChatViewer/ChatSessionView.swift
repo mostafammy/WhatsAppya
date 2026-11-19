@@ -65,6 +65,19 @@ struct ChatSessionView: View {
 private struct MessageRowView: View {
     let message: ChatMessage
 
+    private var formattedTime: String {
+        let cleaned = message.rawTime
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+            .replacingOccurrences(of: "ص", with: "AM")
+            .replacingOccurrences(of: "م", with: "PM")
+        let parts = cleaned.split(separator: ":", maxSplits: 2)
+        if parts.count == 3 {
+            let suffix = parts[2].drop(while: { $0.isNumber })
+            return "\(parts[0]):\(parts[1])\(suffix)"
+        }
+        return cleaned
+    }
+
     var body: some View {
         if message.kind == .system || message.kind == .call {
             Text(message.kind == .call ? "📞 \(message.text)" : message.text)
@@ -91,7 +104,7 @@ private struct MessageRowView: View {
                         Text(message.text)
                             .font(.body)
                     }
-                    Text(message.isEdited ? "Edited · \(message.rawTime)" : message.rawTime)
+                    Text(message.isEdited ? "Edited · \(formattedTime)" : formattedTime)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
