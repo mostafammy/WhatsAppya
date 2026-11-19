@@ -77,19 +77,20 @@ export class WaMessageList extends HTMLElement {
         }
         .sticky-date {
           position: absolute;
-          top: 10px;
+          top: 12px;
           left: 50%;
           transform: translateX(-50%);
           z-index: 5;
           pointer-events: none;
-          background: var(--wa-system-bg);
+          background: var(--wa-date-bg);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           color: var(--wa-text-secondary);
-          font-size: 11.5px;
+          font-size: 12px;
           font-weight: 600;
-          padding: 4px 12px;
-          border-radius: 999px;
+          letter-spacing: -0.05px;
+          padding: 5px 14px;
+          border-radius: 12px;
           box-shadow: var(--wa-shadow-sm);
           border: 1px solid var(--wa-border);
           opacity: 0;
@@ -102,12 +103,20 @@ export class WaMessageList extends HTMLElement {
           overflow-y: auto;
           overflow-x: hidden;
           position: relative;
+          background-color: var(--wa-canvas);
+          background-image: radial-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+          background-size: 20px 20px;
           -webkit-overflow-scrolling: touch;
+        }
+        @media (prefers-color-scheme: dark) {
+          .scroller {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          }
         }
         .canvas {
           position: relative;
           width: 100%;
-          max-width: 920px;
+          max-width: 980px;
           margin: 0 auto;
         }
         .row {
@@ -115,7 +124,7 @@ export class WaMessageList extends HTMLElement {
           top: 0;
           left: 0;
           right: 0;
-          padding: 4px 16px;
+          padding: 4px 5%;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
@@ -126,8 +135,10 @@ export class WaMessageList extends HTMLElement {
         .row.received { align-items: flex-start; }
         .row.system, .row.call { align-items: center; }
         .bubble {
-          max-width: min(76%, 560px);
-          padding: 8px 12px;
+          position: relative;
+          max-width: min(72%, 580px);
+          min-width: 96px;
+          padding: 7px 11px 8px;
           border-radius: 14px;
           box-shadow: var(--wa-shadow-sm);
           background: var(--wa-bubble-received);
@@ -137,24 +148,49 @@ export class WaMessageList extends HTMLElement {
         }
         .row.sent .bubble {
           background: var(--wa-bubble-sent);
-          border-bottom-right-radius: 4px;
+          border-bottom-right-radius: 3px;
+        }
+        .row.sent .bubble::after {
+          content: "";
+          position: absolute;
+          right: -6px;
+          bottom: 0;
+          width: 0;
+          height: 0;
+          border-style: solid;
+          border-width: 0 0 10px 8px;
+          border-color: transparent transparent var(--wa-bubble-sent) transparent;
         }
         .row.received .bubble {
-          border-bottom-left-radius: 4px;
+          border-bottom-left-radius: 3px;
+        }
+        .row.received .bubble::after {
+          content: "";
+          position: absolute;
+          left: -6px;
+          bottom: 0;
+          width: 0;
+          height: 0;
+          border-style: solid;
+          border-width: 0 8px 10px 0;
+          border-color: transparent var(--wa-bubble-received) transparent transparent;
         }
         .row.highlighted .bubble {
           box-shadow: 0 0 0 2.5px var(--wa-accent), var(--wa-shadow-lg);
         }
         .sender {
-          font-size: 12px;
+          font-size: 12.5px;
           font-weight: 600;
-          color: var(--wa-accent);
+          letter-spacing: -0.1px;
+          color: var(--wa-sender-color);
           margin-bottom: 3px;
         }
         .text {
           font-size: 14.5px;
-          line-height: 1.45;
+          line-height: 1.42;
+          letter-spacing: -0.15px;
           white-space: pre-wrap;
+          unicode-bidi: isolate;
         }
         .text.deleted {
           font-style: italic;
@@ -170,10 +206,12 @@ export class WaMessageList extends HTMLElement {
         }
         .system-pill {
           background: var(--wa-system-bg);
-          color: var(--wa-text-secondary);
-          font-size: 12px;
-          padding: 5px 12px;
-          border-radius: 999px;
+          color: var(--wa-system-text);
+          border: 1px solid var(--wa-border);
+          font-size: 12.5px;
+          font-weight: 500;
+          padding: 6px 14px;
+          border-radius: 10px;
           box-shadow: var(--wa-shadow-sm);
           text-align: center;
           max-width: 82%;

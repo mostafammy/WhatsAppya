@@ -7,9 +7,7 @@ import type {
 } from "@whatsappya/core";
 import { StandaloneHtmlExporter } from "@whatsappya/exporter";
 import {
-  type BreadcrumbSegment,
   type LightboxItem,
-  type WaBreadcrumbs,
   type WaLightbox,
   type WaMessageList,
   type WaSearch,
@@ -24,18 +22,21 @@ import { openStatsModal } from "../stats/StatsModal.js";
 import { SearchWorkerClient } from "./SearchWorkerClient.js";
 
 /**
- * Feature slice: orchestrates `<wa-split-view>`, `<wa-breadcrumbs>`, `<wa-message-list>`,
- * `<wa-search>` (backed by Web Worker search), `<wa-lightbox>`, and offline HTML export.
+ * Feature slice: single Cupertino frosted-glass header + `<wa-split-view>` + `<wa-message-list>`
+ * + `<wa-search>` (Web Worker) + `<wa-lightbox>` + Insights + Offline HTML export.
  */
 export class ViewerController {
   readonly #searchClient = new SearchWorkerClient();
   readonly #sessionsCache = new Map<string, ChatSession>();
   #activeSession: ChatSession | null = null;
   #splitView!: WaSplitView;
-  #breadcrumbs!: WaBreadcrumbs;
   #messageList!: WaMessageList;
   #search!: WaSearch;
   #lightbox!: WaLightbox;
+  #avatarEl!: HTMLDivElement;
+  #titleEl!: HTMLHeadingElement;
+  #subtitleEl!: HTMLDivElement;
+  #sidebarBtn!: HTMLButtonElement;
 
   constructor(
     private readonly root: HTMLElement,
@@ -46,27 +47,123 @@ export class ViewerController {
   async mount(): Promise<void> {
     this.root.innerHTML = `
       <style>
-        .shell{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
-        .topbar-actions{display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid rgba(0,0,0,.08);background:var(--wa-surface,#fff);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px}
-        .stats-btn{margin-left:auto;border:1px solid rgba(0,0,0,.15);background:transparent;border-radius:8px;padding:5px 10px;font-weight:600;cursor:pointer}
-        .export-btn{border:none;background:#007AFF;color:#fff;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer}
-        .reset-btn{border:1px solid rgba(0,0,0,.15);background:transparent;border-radius:8px;padding:5px 10px;cursor:pointer}
+        *{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100%}
+        .shell{
+          display:flex;
+          flex-direction:column;
+          height:100vh;
+          width:100vw;
+          overflow:hidden;
+          background:#efeae2;
+          font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","SF Arabic",sans-serif;
+          color:#111b21;
+        }
+        @media(prefers-color-scheme:dark){
+          .shell{background:#0b141a;color:#e9edef}
+        }
+        .chat-header{
+          height:64px;
+          padding:0 18px;
+          display:flex;
+          align-items:center;
+          gap:12px;
+          background:rgba(255,255,255,.88);
+          backdrop-filter:blur(20px);
+          -webkit-backdrop-filter:blur(20px);
+          border-bottom:1px solid rgba(0,0,0,.08);
+          flex-shrink:0;
+          z-index:20;
+        }
+        @media(prefers-color-scheme:dark){
+          .chat-header{background:rgba(17,27,33,.9);border-bottom-color:rgba(255,255,255,.08)}
+        }
+        .icon-btn{
+          border:none;
+          background:rgba(120,120,128,.12);
+          color:inherit;
+          height:34px;
+          padding:0 11px;
+          border-radius:10px;
+          font-family:inherit;
+          font-size:13px;
+          font-weight:600;
+          cursor:pointer;
+          display:inline-flex;
+          align-items:center;
+          gap:6px;
+          transition:background 120ms,transform 120ms;
+        }
+        .icon-btn:hover{background:rgba(120,120,128,.2)}
+        .icon-btn:active{transform:scale(.96)}
+        .icon-btn.primary{background:#007AFF;color:#fff}
+        .icon-btn.primary:hover{filter:brightness(1.08);background:#007AFF}
+        .sidebar-btn{display:none}
+        .sidebar-btn.visible{display:inline-flex}
+        .header-avatar{
+          width:40px;
+          height:40px;
+          border-radius:50%;
+          background:linear-gradient(135deg,#007aff,#00c6ff);
+          color:#fff;
+          font-size:17px;
+          font-weight:700;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          flex-shrink:0;
+          box-shadow:0 2px 8px rgba(0,122,255,.28);
+        }
+        .header-info{flex:1;min-width:0}
+        .header-info h1{
+          font-size:16px;
+          font-weight:600;
+          letter-spacing:-.35px;
+          white-space:nowrap;
+          overflow:hidden;
+          text-overflow:ellipsis;
+        }
+        .header-info .subtitle{
+          font-size:12.5px;
+          color:#667781;
+          margin-top:1px;
+        }
+        @media(prefers-color-scheme:dark){
+          .header-info .subtitle{color:#8696a0}
+        }
+        .header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+        kbd{
+          font-family:inherit;
+          font-size:11px;
+          padding:1px 5px;
+          border-radius:5px;
+          background:rgba(0,0,0,.08);
+        }
+        @media(prefers-color-scheme:dark){
+          kbd{background:rgba(255,255,255,.12)}
+        }
         wa-split-view{flex:1;min-height:0}
-        .chat-pane{display:flex;flex-direction:column;height:100%;min-height:0}
-        wa-message-list{flex:1;min-height:0}
+        wa-message-list{height:100%;width:100%}
       </style>
       <div class="shell">
-        <div class="topbar-actions">
-          <button class="reset-btn" type="button">← New Export</button>
-          <span class="archive-title"></span>
-          <button class="stats-btn" type="button">Insights</button>
-          <button class="export-btn" type="button">Export Offline HTML</button>
-        </div>
-        <wa-split-view>
-          <div class="chat-pane">
-            <wa-breadcrumbs></wa-breadcrumbs>
-            <wa-message-list></wa-message-list>
+        <header class="chat-header">
+          <button class="icon-btn sidebar-btn" type="button" aria-label="Toggle chats sidebar">☰</button>
+          <button class="icon-btn reset-btn" type="button" title="Open another export">← Open</button>
+          <div class="header-avatar" aria-hidden="true">💬</div>
+          <div class="header-info">
+            <h1 dir="auto">WhatsApp Chat</h1>
+            <div class="subtitle">Loading…</div>
           </div>
+          <div class="header-actions">
+            <button class="icon-btn search-btn" type="button" aria-label="Search messages">
+              <span>Search</span><kbd>⌘K</kbd>
+            </button>
+            <button class="icon-btn stats-btn" type="button">Insights</button>
+            <button class="icon-btn primary export-btn" type="button">Export HTML</button>
+          </div>
+        </header>
+        <wa-split-view>
+          <wa-message-list></wa-message-list>
         </wa-split-view>
         <wa-search></wa-search>
         <wa-lightbox></wa-lightbox>
@@ -74,51 +171,50 @@ export class ViewerController {
     `;
 
     const split = this.root.querySelector<WaSplitView>("wa-split-view");
-    const crumbs = this.root.querySelector<WaBreadcrumbs>("wa-breadcrumbs");
     const list = this.root.querySelector<WaMessageList>("wa-message-list");
     const search = this.root.querySelector<WaSearch>("wa-search");
     const lightbox = this.root.querySelector<WaLightbox>("wa-lightbox");
-    const titleEl = this.root.querySelector<HTMLSpanElement>(".archive-title");
+    const avatar = this.root.querySelector<HTMLDivElement>(".header-avatar");
+    const title = this.root.querySelector<HTMLHeadingElement>(".header-info h1");
+    const subtitle = this.root.querySelector<HTMLDivElement>(".header-info .subtitle");
+    const sidebarBtn = this.root.querySelector<HTMLButtonElement>(".sidebar-btn");
 
-    if (!split || !crumbs || !list || !search || !lightbox) {
+    if (!split || !list || !search || !lightbox || !avatar || !title || !subtitle || !sidebarBtn) {
       throw new Error("Viewer shell elements failed to mount");
     }
 
     this.#splitView = split;
-    this.#breadcrumbs = crumbs;
     this.#messageList = list;
     this.#search = search;
     this.#lightbox = lightbox;
+    this.#avatarEl = avatar;
+    this.#titleEl = title;
+    this.#subtitleEl = subtitle;
+    this.#sidebarBtn = sidebarBtn;
 
     this.#messageList.leases = defaultMediaLeases;
     this.#lightbox.leases = defaultMediaLeases;
     this.#splitView.tree = this.tree;
 
     if (this.#splitView.hasSidebar) {
-      this.#breadcrumbs.setAttribute("has-sidebar", "");
-    }
-    if (titleEl) {
-      titleEl.textContent = this.tree.root.name;
+      this.#sidebarBtn.classList.add("visible");
     }
 
     this.#bindEvents();
 
     const firstChat = unwrapSingleChat(this.tree.root) ?? this.#findFirstChat(this.tree);
     if (firstChat) {
-      await this.#loadChat(firstChat, [{ id: "root", label: this.tree.root.name }]);
+      await this.#loadChat(firstChat);
     }
   }
 
   #bindEvents(): void {
-    this.#breadcrumbs.addEventListener("wa-search-open", () => this.#search.open());
-    this.#breadcrumbs.addEventListener("wa-sidebar-toggle", () => this.#splitView.toggleSidebar());
+    this.#sidebarBtn.addEventListener("click", () => this.#splitView.toggleSidebar());
+    this.root.querySelector(".search-btn")?.addEventListener("click", () => this.#search.open());
 
     this.#splitView.addEventListener("wa-chat-select", (e) => {
       const detail = (e as CustomEvent<{ chat: ChatSummaryNode }>).detail;
-      void this.#loadChat(detail.chat, [
-        { id: "root", label: this.tree.root.name },
-        { id: detail.chat.id, label: detail.chat.contactName || detail.chat.title },
-      ]);
+      void this.#loadChat(detail.chat);
     });
 
     this.#search.addEventListener("wa-search-select", (e) => {
@@ -142,7 +238,7 @@ export class ViewerController {
     });
   }
 
-  async #loadChat(chat: ChatSummaryNode, segments: readonly BreadcrumbSegment[]): Promise<void> {
+  async #loadChat(chat: ChatSummaryNode): Promise<void> {
     let session = this.#sessionsCache.get(chat.id);
     if (!session) {
       const res = await createConvertChat().execute({
@@ -160,8 +256,12 @@ export class ViewerController {
     this.#messageList.session = session;
     this.#search.searchIndex = this.#searchClient;
     this.#search.chapterId = countArchiveChats(this.tree.root) > 1 ? chat.id : undefined;
-    this.#breadcrumbs.segments =
-      segments.length > 0 ? segments : [{ id: chat.id, label: session.contactName }];
+
+    const displayName = session.contactName || session.title;
+    this.#titleEl.textContent = displayName;
+    this.#subtitleEl.textContent = `${session.messages.length.toLocaleString()} messages`;
+    const initial = Array.from(displayName.trim())[0];
+    this.#avatarEl.textContent = initial ? initial.toUpperCase() : "💬";
   }
 
   #findFirstChat(tree: ArchiveTree): ChatSummaryNode | null {

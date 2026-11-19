@@ -5,7 +5,7 @@ import {
   IosParser,
   ParserRegistry,
 } from "@whatsappya/core";
-import type { ZipFileSource } from "@whatsappya/platform-web";
+import type { FileListSource, ZipFileSource } from "@whatsappya/platform-web";
 import type { MediaSourceResolver } from "@whatsappya/viewer";
 
 export const createParserRegistry = (): ParserRegistry =>
@@ -43,5 +43,16 @@ export class ZipMediaResolver implements MediaSourceResolver {
 
     const resolvedPath = this.#basenameIndex.get(fileName.toLowerCase()) ?? fileName;
     return this.zip.sliceBlob(resolvedPath, mimeType);
+  }
+}
+
+/**
+ * Resolves attachment filenames from an unzipped browser folder (`FileListSource`) with zero copying.
+ */
+export class FileListMediaResolver implements MediaSourceResolver {
+  constructor(private readonly folder: FileListSource) {}
+
+  async resolveMedia(fileName: string): Promise<Blob | string> {
+    return this.folder.getBlob(fileName);
   }
 }
