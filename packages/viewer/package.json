@@ -4,11 +4,18 @@
   "private": true,
   "description": "Framework-free Web Components chat viewer (virtualized list, voice notes, stickers, lightbox).",
   "type": "module",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./standalone": {
+      "types": "./dist/standalone-bundle.d.ts",
+      "import": "./dist/standalone-bundle.js"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-standalone.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": { "@whatsappya/core": "workspace:*" }
+  "dependencies": { "@whatsappya/core": "workspace:*" },
+  "devDependencies": { "esbuild": "^0.25.12" }
 }

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "title": "Chat with Alex",
+  "contactName": "Alex",
+  "ownerName": "Sam",
+  "dateOrder": "day_first",
+  "messages": [
+    {
+      "id": "m0",
+      "rawDate": "17/11/2026",
+      "rawTime": "9:15:02 AM",
+      "timestamp": "2026-11-17T09:15:02.000Z",
+      "sender": "Alex",
+      "text": "Good morning ☀️",
+      "kind": "message",
+      "direction": "received",
+      "attachment": null,
+      "isDeleted": false,
+      "isEdited": false
+    },
+    {
+      "id": "m1",
+      "rawDate": "17/11/2026",
+      "rawTime": "9:15:40 AM",
+      "timestamp": "2026-11-17T09:15:40.000Z",
+      "sender": "Sam",
+      "text": "Morning! Did you see the deck?",
+      "kind": "message",
+      "direction": "sent",
+      "attachment": null,
+      "isDeleted": false,
+      "isEdited": false
+    },
+    {
+      "id": "m2",
+      "rawDate": "17/11/2026",
+      "rawTime": "9:16:05 AM",
+      "timestamp": "2026-11-17T09:16:05.000Z",
+      "sender": "Alex",
+      "text": "",
+      "kind": "message",
+      "direction": "received",
+      "attachment": {
+        "fileName": "00000001-PHOTO-2026-11-17-09-16-05.jpg",
+        "kind": "image",
+        "mimeType": "image/jpeg",
+        "sizeBytes": 16,
+        "isOmitted": false
+      },
+      "isDeleted": false,
+      "isEdited": false
+    },
+    {
+      "id": "m3",
+      "rawDate": "17/11/2026",
+      "rawTime": "9:17:12 AM",
+      "timestamp": "2026-11-17T09:17:12.000Z",
+      "sender": "Sam",
+      "text": "Looks great",
+      "kind": "message",
+      "direction": "sent",
+      "attachment": null,
+      "isDeleted": false,
+      "isEdited": true
+    }
+  ],
+  "senderCounts": {
+    "Alex": 2,
+    "Sam": 2
+  }
+}

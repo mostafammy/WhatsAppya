@@ -47,5 +47,9 @@ apps/android-twa/*.keystore
 # (Fixtures must stay synthetic — NEVER commit real chats.)
 !apps/web/public/**
 !apps/ios/**/*.xcassets/**
-!packages/design-tokens/**
+!packages/design-tokens/tokens/**
+!packages/design-tokens/scripts/**
+!packages/design-tokens/package.json
+!packages/design-tokens/tsconfig.json
+!packages/design-tokens/README.md
 !fixtures/**

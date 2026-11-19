@@ -1,0 +1,487 @@
+import { type ChatMessage, type ChatSession, LinkStage } from "@whatsappya/core";
+import { type MediaLeaseManager, defaultMediaLeases } from "../../media/MediaLeaseManager.js";
+import { VIEWER_BASE_CSS } from "../../styles/theme.js";
+import type { LightboxItem } from "../lightbox/WaLightbox.js";
+import type { WaSticker } from "../sticker/WaSticker.js";
+import type { WaVoiceNote } from "../voice-note/WaVoiceNote.js";
+import { FenwickTree } from "./FenwickTree.js";
+
+const OVERSCAN = 8;
+const DEFAULT_ROW_HEIGHT = 76;
+
+/**
+ * `<wa-message-list>`
+ * High-performance virtualized chat list for 50,000+ messages.
+ * Uses a FenwickTree for O(log N) variable-height scroll offsets, typed DOM recycling,
+ * and a single-rAF batched ResizeObserver (zero forced synchronous reflows).
+ */
+export class WaMessageList extends HTMLElement {
+  #session: ChatSession | null = null;
+  #messages: readonly ChatMessage[] = [];
+  #tree: FenwickTree = new FenwickTree(0, DEFAULT_ROW_HEIGHT);
+  #leases: MediaLeaseManager = defaultMediaLeases;
+
+  #scroller: HTMLDivElement;
+  #canvas: HTMLDivElement;
+  #activeRows = new Map<number, HTMLDivElement>();
+  #freePool: HTMLDivElement[] = [];
+  #rowIndexLookup = new WeakMap<Element, number>();
+  #pendingHeights = new Map<number, number>();
+  #resizeObserver: ResizeObserver | null = null;
+  #rafId = 0;
+  #measureRafId = 0;
+  #highlightedId: string | null = null;
+
+  constructor() {
+    super();
+    const shadow = this.attachShadow({ mode: "open" });
+    shadow.innerHTML = `
+      <style>
+        ${VIEWER_BASE_CSS}
+        :host {
+          display: block;
+          position: relative;
+          height: 100%;
+          width: 100%;
+          background: var(--wa-canvas);
+          overflow: hidden;
+        }
+        .scroller {
+          height: 100%;
+          width: 100%;
+          overflow-y: auto;
+          overflow-x: hidden;
+          position: relative;
+          -webkit-overflow-scrolling: touch;
+        }
+        .canvas {
+          position: relative;
+          width: 100%;
+          max-width: 920px;
+          margin: 0 auto;
+        }
+        .row {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          padding: 4px 16px;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          will-change: transform;
+        }
+        .row.sent { align-items: flex-end; }
+        .row.received { align-items: flex-start; }
+        .row.system, .row.call { align-items: center; }
+        .bubble {
+          max-width: min(76%, 560px);
+          padding: 8px 12px;
+          border-radius: 14px;
+          box-shadow: var(--wa-shadow-sm);
+          background: var(--wa-bubble-received);
+          word-wrap: break-word;
+          overflow-wrap: anywhere;
+          transition: box-shadow var(--wa-duration-base) var(--wa-spring);
+        }
+        .row.sent .bubble {
+          background: var(--wa-bubble-sent);
+          border-bottom-right-radius: 4px;
+        }
+        .row.received .bubble {
+          border-bottom-left-radius: 4px;
+        }
+        .row.highlighted .bubble {
+          box-shadow: 0 0 0 2.5px var(--wa-accent), var(--wa-shadow-lg);
+        }
+        .sender {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--wa-accent);
+          margin-bottom: 3px;
+        }
+        .text {
+          font-size: 14.5px;
+          line-height: 1.45;
+          white-space: pre-wrap;
+        }
+        .text.deleted {
+          font-style: italic;
+          color: var(--wa-text-secondary);
+        }
+        .meta {
+          display: flex;
+          justify-content: flex-end;
+          gap: 6px;
+          margin-top: 4px;
+          font-size: 11px;
+          color: var(--wa-text-secondary);
+        }
+        .system-pill {
+          background: var(--wa-system-bg);
+          color: var(--wa-text-secondary);
+          font-size: 12px;
+          padding: 5px 12px;
+          border-radius: 999px;
+          box-shadow: var(--wa-shadow-sm);
+          text-align: center;
+          max-width: 82%;
+        }
+        .media-thumb {
+          margin-top: 4px;
+          margin-bottom: 4px;
+          border-radius: 10px;
+          overflow: hidden;
+          cursor: pointer;
+          max-width: 280px;
+          border: 1px solid var(--wa-border);
+          background: rgba(0, 0, 0, 0.04);
+        }
+        .media-thumb img {
+          display: block;
+          width: 100%;
+          max-height: 260px;
+          object-fit: cover;
+        }
+        .file-chip, .link-card {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 10px;
+          margin-top: 6px;
+          border-radius: 10px;
+          background: rgba(0, 0, 0, 0.05);
+          border: 1px solid var(--wa-border);
+          font-size: 12.5px;
+          text-decoration: none;
+          color: inherit;
+        }
+        .omitted-note {
+          font-size: 12.5px;
+          font-style: italic;
+          color: var(--wa-text-secondary);
+        }
+      </style>
+      <div class="scroller" role="log" aria-label="Chat messages">
+        <div class="canvas"></div>
+      </div>
+    `;
+
+    const scroller = shadow.querySelector<HTMLDivElement>(".scroller");
+    const canvas = shadow.querySelector<HTMLDivElement>(".canvas");
+    if (!scroller || !canvas) throw new Error("WaMessageList shadow DOM failed");
+    this.#scroller = scroller;
+    this.#canvas = canvas;
+
+    this.#scroller.addEventListener("scroll", () => this.#scheduleRender(), { passive: true });
+
+    if (typeof ResizeObserver !== "undefined") {
+      this.#resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const idx = this.#rowIndexLookup.get(entry.target);
+          if (idx === undefined) continue;
+          const height = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+          if (height > 0) {
+            this.#pendingHeights.set(idx, Math.ceil(height));
+          }
+        }
+        if (this.#pendingHeights.size > 0 && !this.#measureRafId) {
+          this.#measureRafId = requestAnimationFrame(() => this.#flushMeasuredHeights());
+        }
+      });
+    }
+  }
+
+  get session(): ChatSession | null {
+    return this.#session;
+  }
+
+  set session(value: ChatSession | null) {
+    this.#session = value;
+    this.#messages = value?.messages ?? [];
+    this.#resetVirtualState();
+  }
+
+  set leases(manager: MediaLeaseManager) {
+    this.#leases = manager;
+  }
+
+  get visibleRange(): { start: number; end: number } {
+    return this.#computeRange();
+  }
+
+  disconnectedCallback(): void {
+    if (this.#rafId) cancelAnimationFrame(this.#rafId);
+    if (this.#measureRafId) cancelAnimationFrame(this.#measureRafId);
+    this.#resizeObserver?.disconnect();
+    this.#clearActiveRows();
+  }
+
+  scrollToMessage(target: string | number): void {
+    const idx =
+      typeof target === "number" ? target : this.#messages.findIndex((m) => m.id === target);
+    if (idx < 0 || idx >= this.#messages.length) return;
+
+    const msg = this.#messages[idx];
+    this.#highlightedId = msg?.id ?? null;
+    const top = this.#tree.prefixSum(idx);
+    this.#scroller.scrollTop = Math.max(0, top - 64);
+    this.#render();
+  }
+
+  #resetVirtualState(): void {
+    this.#clearActiveRows();
+    this.#pendingHeights.clear();
+    this.#tree = new FenwickTree(this.#messages.length, DEFAULT_ROW_HEIGHT);
+    this.#canvas.style.height = `${this.#tree.totalHeight()}px`;
+    this.#scroller.scrollTop = 0;
+    this.#render();
+  }
+
+  #clearActiveRows(): void {
+    for (const row of this.#activeRows.values()) {
+      this.#resizeObserver?.unobserve(row);
+      row.remove();
+      this.#freePool.push(row);
+    }
+    this.#activeRows.clear();
+  }
+
+  #scheduleRender(): void {
+    if (this.#rafId) return;
+    this.#rafId = requestAnimationFrame(() => {
+      this.#rafId = 0;
+      this.#render();
+    });
+  }
+
+  #computeRange(): { start: number; end: number } {
+    const total = this.#messages.length;
+    if (total === 0) return { start: 0, end: -1 };
+
+    const scrollTop = this.#scroller.scrollTop;
+    const viewport = this.#scroller.clientHeight || 800;
+
+    const firstVisible = this.#tree.findIndexByOffset(scrollTop);
+    const lastVisible = this.#tree.findIndexByOffset(scrollTop + viewport);
+
+    return {
+      start: Math.max(0, firstVisible - OVERSCAN),
+      end: Math.min(total - 1, lastVisible + OVERSCAN),
+    };
+  }
+
+  #render(): void {
+    const { start, end } = this.#computeRange();
+
+    // Recycle rows outside visible window
+    for (const [idx, row] of this.#activeRows) {
+      if (idx < start || idx > end) {
+        this.#resizeObserver?.unobserve(row);
+        row.remove();
+        this.#freePool.push(row);
+        this.#activeRows.delete(idx);
+      }
+    }
+
+    if (end < start) return;
+
+    const fragment = document.createDocumentFragment();
+    for (let i = start; i <= end; i++) {
+      let row = this.#activeRows.get(i);
+      if (!row) {
+        row = this.#freePool.pop() ?? document.createElement("div");
+        this.#populateRow(row, i);
+        this.#activeRows.set(i, row);
+        this.#rowIndexLookup.set(row, i);
+        this.#resizeObserver?.observe(row);
+        fragment.appendChild(row);
+      }
+      const y = this.#tree.prefixSum(i);
+      row.style.transform = `translate3d(0, ${y}px, 0)`;
+      const msg = this.#messages[i];
+      row.classList.toggle("highlighted", Boolean(msg && msg.id === this.#highlightedId));
+    }
+
+    if (fragment.childNodes.length > 0) {
+      this.#canvas.appendChild(fragment);
+    }
+  }
+
+  #flushMeasuredHeights(): void {
+    this.#measureRafId = 0;
+    let changed = false;
+    for (const [idx, h] of this.#pendingHeights) {
+      if (Math.abs(this.#tree.getHeight(idx) - h) >= 1) {
+        this.#tree.update(idx, h);
+        changed = true;
+      }
+    }
+    this.#pendingHeights.clear();
+    if (changed) {
+      this.#canvas.style.height = `${this.#tree.totalHeight()}px`;
+      for (const [idx, row] of this.#activeRows) {
+        row.style.transform = `translate3d(0, ${this.#tree.prefixSum(idx)}px, 0)`;
+      }
+    }
+  }
+
+  #populateRow(row: HTMLDivElement, index: number): void {
+    const msg = this.#messages[index];
+    row.innerHTML = "";
+    row.className = "row";
+    if (!msg) return;
+
+    row.dataset.index = String(index);
+    row.dataset.id = msg.id;
+
+    if (msg.kind === "system" || msg.kind === "call") {
+      row.classList.add(msg.kind);
+      const pill = document.createElement("div");
+      pill.className = "system-pill";
+      pill.dir = "auto";
+      pill.textContent = msg.kind === "call" ? `📞 ${msg.text}` : msg.text;
+      row.appendChild(pill);
+      return;
+    }
+
+    row.classList.add(msg.direction);
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+
+    if (msg.direction === "received" && msg.sender) {
+      const senderEl = document.createElement("div");
+      senderEl.className = "sender";
+      senderEl.dir = "auto";
+      senderEl.textContent = msg.sender;
+      bubble.appendChild(senderEl);
+    }
+
+    if (msg.attachment) {
+      bubble.appendChild(this.#renderAttachment(msg));
+    }
+
+    if (msg.text) {
+      const textEl = document.createElement("div");
+      textEl.className = msg.isDeleted ? "text deleted" : "text";
+      textEl.dir = "auto";
+      textEl.textContent = msg.text;
+      bubble.appendChild(textEl);
+
+      const links = LinkStage.extractUrls(msg.text);
+      for (const link of links) {
+        const card = document.createElement("a");
+        card.className = "link-card";
+        card.href = link.rawUrl;
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+        card.textContent = `${link.icon} ${link.title}`;
+        bubble.appendChild(card);
+      }
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = msg.isEdited ? `Edited · ${msg.rawTime}` : msg.rawTime;
+    bubble.appendChild(meta);
+
+    row.appendChild(bubble);
+  }
+
+  #renderAttachment(msg: ChatMessage): HTMLElement {
+    const att = msg.attachment;
+    if (!att) return document.createElement("span");
+
+    if (att.isOmitted || att.kind === "omitted") {
+      const note = document.createElement("div");
+      note.className = "omitted-note";
+      note.textContent = att.fileName;
+      return note;
+    }
+
+    if (att.kind === "audio") {
+      const voice = document.createElement("wa-voice-note") as WaVoiceNote;
+      voice.messageId = msg.id;
+      voice.fileName = att.fileName;
+      voice.mimeType = att.mimeType;
+      if (att.durationSeconds !== undefined) {
+        voice.setAttribute("duration", String(att.durationSeconds));
+      }
+      if (att.waveformPeaks) {
+        voice.waveformPeaks = att.waveformPeaks;
+      }
+      return voice;
+    }
+
+    if (att.kind === "sticker") {
+      const sticker = document.createElement("wa-sticker") as WaSticker;
+      sticker.leases = this.#leases;
+      sticker.fileName = att.fileName;
+      sticker.mimeType = att.mimeType;
+      return sticker;
+    }
+
+    if (att.kind === "image" || att.kind === "video") {
+      const thumb = document.createElement("div");
+      thumb.className = "media-thumb";
+      thumb.setAttribute("role", "button");
+      thumb.tabIndex = 0;
+      thumb.setAttribute("aria-label", `Open ${att.kind} ${att.fileName}`);
+
+      const label = document.createElement("div");
+      label.className = "file-chip";
+      label.style.marginTop = "0";
+      label.textContent = att.kind === "video" ? `🎬 ${att.fileName}` : `🖼️ ${att.fileName}`;
+      thumb.appendChild(label);
+
+      if (att.kind === "image") {
+        void this.#leases.acquire(att.fileName, att.mimeType).then((url) => {
+          if (!thumb.isConnected) {
+            this.#leases.release(att.fileName);
+            return;
+          }
+          const img = document.createElement("img");
+          img.src = url;
+          img.alt = msg.text || att.fileName;
+          img.loading = "lazy";
+          thumb.innerHTML = "";
+          thumb.appendChild(img);
+        });
+      }
+
+      const openHandler = () => {
+        const item: LightboxItem = {
+          fileName: att.fileName,
+          mimeType: att.mimeType,
+          kind: att.kind === "video" ? "video" : "image",
+          ...(msg.text ? { caption: msg.text } : {}),
+        };
+        this.dispatchEvent(
+          new CustomEvent("wa-media-open", {
+            bubbles: true,
+            composed: true,
+            detail: { item },
+          }),
+        );
+      };
+
+      thumb.addEventListener("click", openHandler);
+      thumb.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openHandler();
+        }
+      });
+      return thumb;
+    }
+
+    const chip = document.createElement("div");
+    chip.className = "file-chip";
+    chip.textContent = `📎 ${att.fileName}`;
+    return chip;
+  }
+}
+
+if (typeof customElements !== "undefined" && !customElements.get("wa-message-list")) {
+  customElements.define("wa-message-list", WaMessageList);
+}

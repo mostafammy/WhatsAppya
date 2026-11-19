@@ -13,7 +13,8 @@
   "dependencies": {
     "@whatsappya/core": "workspace:*",
     "@whatsappya/exporter": "workspace:*",
-    "@whatsappya/platform-node": "workspace:*"
+    "@whatsappya/platform-node": "workspace:*",
+    "@whatsappya/viewer": "workspace:*"
   },
   "devDependencies": { "@types/node": "^22.10.0" }
 }

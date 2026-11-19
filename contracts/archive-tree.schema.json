@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://whatsappya.app/schemas/archive-tree.v1.json",
+  "title": "ArchiveTree v1",
+  "description": "Cross-language contract for recursive directory and multi-chapter curriculum archives.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "root"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "root": { "$ref": "#/$defs/ArchiveFolder" }
+  },
+  "$defs": {
+    "ArchiveFolder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "path", "children", "chats"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArchiveFolder" }
+        },
+        "chats": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ChatSummaryNode" }
+        }
+      }
+    },
+    "ChatSummaryNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "contactName", "messageCount", "path", "exportFormat"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "contactName": { "type": "string" },
+        "messageCount": { "type": "integer", "minimum": 0 },
+        "path": { "type": "string" },
+        "exportFormat": { "enum": ["ios", "android", "unknown"] },
+        "dateRange": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "type": ["string", "null"] },
+            "end": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  }
+}

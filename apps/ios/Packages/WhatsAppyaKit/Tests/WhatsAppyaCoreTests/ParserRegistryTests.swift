@@ -1,4 +1,4 @@
-import XCTest
+import Testing
 @testable import WhatsAppyaCore
 
 private struct FakeParser: ChatParser {
@@ -7,11 +7,9 @@ private struct FakeParser: ChatParser {
     func parse(_ text: String) -> [RawMessage] { [] }
 }
 
-final class ParserRegistryTests: XCTestCase {
-    func testResolvesRegisteredStrategy() {
-        var registry = ParserRegistry()
-        registry.register(FakeParser())
-        XCTAssertEqual(registry.resolve(for: "FAKE line")?.id, "fake")
-        XCTAssertNil(registry.resolve(for: "unknown"))
-    }
+@Test func resolvesRegisteredStrategy() {
+    var registry = ParserRegistry()
+    registry.register(FakeParser())
+    #expect(registry.resolve(for: "FAKE line")?.id == "fake")
+    #expect(registry.resolve(for: "unknown") == nil)
 }

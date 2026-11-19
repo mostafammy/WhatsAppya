@@ -1,87 +1,96 @@
-#  WhatsAppya
+# WhatsAppya
 
-> **WhatsAppya** transforms exported WhatsApp chats into Apple-grade interactive HTML viewers with multi-tier curricular support (Multiple Blocks, Multiple Subjects per Block, Multiple Chapters per Subject).
+> **WhatsAppya** is a private, 100% on-device WhatsApp chat export viewer, archive reader, and offline HTML exporter for Web/PWA, CLI, Android TWA, and native iOS (Swift).
 
-[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)](https://python.org)
-[![Code Architecture](https://img.shields.io/badge/architecture-SOLID%20%7C%20GoF-orange.svg)]()
-[![Design System](https://img.shields.io/badge/design-Apple%20HIG%20%7C%20Cupertino-black.svg)]()
+[![Architecture](https://img.shields.io/badge/architecture-Hexagonal%20%7C%20SOLID-orange.svg)](docs/ARCHITECTURE.md)
+[![Design](https://img.shields.io/badge/design-Apple%20HIG%20%7C%20Cupertino-black.svg)](docs/designs/whatsappya-3-phase-architecture.md)
 
 ---
 
-## ✨ Features
+## Key Capabilities
 
-- ** Apple Human Interface Guidelines (HIG)** - Native SF Pro typography, Cupertino dynamic vibrancy (`backdrop-filter`), and seamless Dark Mode.
-- **📚 Multi-Tier Curricular Navigation** - Organizes chats, voice lectures, and study groups across **Multiple Blocks › Multiple Subjects › Multiple Chapters**.
-- **🎙 Bespoke Voice Note Canvas Player** - Interactive synthetic audio waveforms, drag scrubbing, and variable playback speed (1.0× / 1.5× / 2.0×).
-- **🔍 Universal Spotlight Search (⌘K / ⌘F)** - Inverted index enabling sub-20ms instant full-text search across all chapters, messages, and voice notes.
-- **🖼 Inline Media Studio** - Full inline support for images, videos, audio notes, and PDFs with interactive fullscreen lightbox.
-- **🔒 100% On-Device Privacy** - Zero cloud egress, zero external CDN dependencies, and zero telemetry. Everything runs locally from a `file://` URI.
-- **🌍 BiDi & Multilingual Harmony** - Flawless bidirectional rendering for Arabic and English conversations with strict punctuation isolation.
-
----
-
-## 🚀 Quick Start
-
-### Requirements
-- Python 3.10 or higher
-- Any modern web browser (Safari, Chrome, Edge, Firefox)
-
-### Installation
-
-Clone the repository:
-```bash
-git clone https://github.com/mostafammy/WhatsAppya.git
-cd WhatsAppya
-```
-
-*Zero external dependencies required — runs 100% on Python standard library!*
+- **Zero-Copy ZIP Ingestion** — Reads the ZIP Central Directory via tail-slicing and loads attachments lazily on demand (`ZipFileSource.sliceBlob()`), avoiding full-archive memory copies.
+- **Virtualized 50k+ Message Viewer (`<wa-message-list>`)** — Framework-free Web Components powered by a Fenwick tree (`O(log N)` offsets), typed DOM node pooling, and single-`rAF` `ResizeObserver` batching.
+- **Two-Tier Hybrid Spotlight Search (`⌘K` / `Ctrl+K`)** — Off-main-thread Web Worker running compact `Uint32Array` posting lists + Arabic normalization (tashkeel, alef variants, teh marbuta, alef maksura) with a normalized linear scan fallback for URLs and punctuation.
+- **Adaptive Curricular Navigation (`<wa-split-view>`, `<wa-breadcrumbs>`)** — Hides the sidebar automatically for single-chat exports (`sessionCount <= 1`) and presents a collapsible tree for multi-chapter archives (`Blocks › Subjects › Chapters`).
+- **Self-Contained Offline HTML Exports** — Bundles the complete `<wa-message-list>`, `<wa-voice-note>`, `<wa-sticker>`, `<wa-lightbox>`, `<wa-search>`, and `HybridSearchIndex` runtime into a `file://`-safe IIFE (`--standalone` or folder bundle with opt-in `--legacy-voice-cache`).
+- **100% On-Device Privacy** — Strict `connect-src 'none'` CSP, offline Service Worker app-shell cache, and Android Web Share Target (`POST /share-target`) with zero cloud egress.
+- **Cross-Language Parity (TypeScript + Swift)** — Shared JSON Schema contracts (`contracts/`) and golden fixtures (`fixtures/golden/`) verified across both `@whatsappya/core` and native Swift `WhatsAppyaCore`.
 
 ---
 
-## 📖 Usage
+## Quick Start
 
-### 1. Single Chat Archival Mode
+### Prerequisites
+- **Node.js 22+** and **pnpm 12+**
+- **Swift 5.10+ / 6.x** (optional, for native iOS package verification)
 
-Point **WhatsAppya** to any unzipped WhatsApp export directory containing `_chat.txt` and its media:
+### Install & Run CI
 
 ```bash
-python3 main.py "path/to/WhatsApp Chat Export"
+pnpm install
+pnpm run ci
 ```
 
-This generates a standalone, interactive `chat.html` inside the export folder.
+### 1. Web PWA (Drag-and-Drop / Android Share Target)
 
-### 2. Multi-Tier Curricular Mode (Blocks › Subjects › Chapters)
-
-Point **WhatsAppya** to a directory structured with curricular folders:
-
-```
-Curriculum/
-├── Block 1 - Cardiovascular/
-│   ├── Anatomy/
-│   │   ├── Chapter 1 - Heart Chambers/ (_chat.txt + media)
-│   │   └── Chapter 2 - Valves/ (_chat.txt + media)
-│   └── Physiology/
-│       └── Chapter 1 - Cardiac Cycle/ (_chat.txt + media)
-└── Block 2 - Respiratory/
-    └── Pulmonology/
-        └── Chapter 1 - Gas Exchange/ (_chat.txt + media)
-```
-
-Run WhatsAppya in curricular mode:
 ```bash
-python3 main.py "path/to/Curriculum" --output "dist/CurriculumViewer.html"
+pnpm dev
+# Production build:
+pnpm --filter @whatsappya/web build
+```
+
+Drop any `.zip` export or `_chat.txt` file directly onto the page. Press `⌘K` (or `Ctrl+K`) to search, click images/videos for QuickLook preview, or click **Export Offline HTML**.
+
+### 2. CLI (`whatsappya`)
+
+```bash
+pnpm --filter @whatsappya/cli build
+node apps/cli/dist/index.js "path/to/WhatsApp Chat Export" --dist out/
+```
+
+Useful flags:
+- `-o, --output <name>` — Output HTML filename (default: `chat.html`)
+- `-y, --you <name>` — Explicit sender name for sent (right-aligned) bubbles
+- `-d, --dist <dir>` — Output directory (copies media assets and generates outer launcher + `index.html`)
+- `--standalone` — Emit a single self-contained HTML file
+- `--legacy-voice-cache` — Opt-in generation of `_voice_cache/*.js` for `file://` audio fallback
+
+### 3. Native iOS (`WhatsAppyaKit`)
+
+Verify native Swift golden-file parity against the shared JSON fixtures:
+
+```bash
+cd apps/ios/Packages/WhatsAppyaKit
+swift run WhatsAppyaGoldenVerifier
+```
+
+Generate the Xcode project via XcodeGen (`apps/ios/project.yml`):
+
+```bash
+cd apps/ios && xcodegen generate
 ```
 
 ---
 
-## 🏛 Architecture & Engineering Standards
+## Workspace Layout
 
-- **[SPECIFICATION.md](SPECIFICATION.md)**: Apple Engineering Specification (`SPEC-APPL-ACAD-2026-V2`) covering the Composite Tree architecture, SOLID realization matrix, and Cupertino Executive Board review.
-- **[Plan.md](Plan.md)**: Detailed phased engineering roadmap (`PLAN-APPL-ACAD-2026-V2`) with implementable tasks and QA test protocols.
+- **[contracts/](contracts/)** — Canonical cross-language schemas (`chat-session.schema.json`, `archive-tree.schema.json`, `parser-rules.json`).
+- **[packages/core](packages/core/)** (`@whatsappya/core`) — Pure zero-dependency domain models, iOS/Android parsers, pipeline stages, `ConvertChat`, `ConvertArchive`, and `HybridSearchIndex`.
+- **[packages/viewer](packages/viewer/)** (`@whatsappya/viewer`) — Framework-free Custom Elements (`<wa-message-list>`, `<wa-voice-note>`, `<wa-sticker>`, `<wa-lightbox>`, `<wa-search>`, `<wa-split-view>`, `<wa-breadcrumbs>`) + self-contained offline bundle (`@whatsappya/viewer/standalone`).
+- **[packages/exporter](packages/exporter/)** (`@whatsappya/exporter`) — `StandaloneHtmlExporter` and `FolderBundleExporter`.
+- **[packages/platform-web](packages/platform-web/)** & **[packages/platform-node](packages/platform-node/)** — Zero-copy `ZipFileSource` and `DirectoryFileSource` adapters.
+- **[packages/design-tokens](packages/design-tokens/)** — Single-source Cupertino color and motion tokens emitting CSS and Swift.
+- **[apps/web](apps/web/)** — Vite PWA with Service Worker, Web Share Target, and Web Worker search.
+- **[apps/cli](apps/cli/)** — Node.js CLI (`whatsappya`).
+- **[apps/ios](apps/ios/)** — Native SwiftUI app, Share Extension, and `WhatsAppyaKit` Swift Package.
+- **[apps/android-twa](apps/android-twa/)** — Bubblewrap Trusted Web Activity wrapper.
+- **[fixtures/](fixtures/)** — Synthetic exports and golden JSON snapshots verified by both TS and Swift.
+- **[legacy/python/](legacy/python/)** — Archived reference Python 3.10+ implementation (`PYTHONPATH=legacy/python python3 -m unittest discover legacy/python/tests`).
 
 ---
 
-## 📄 License
+## Architecture & Design Docs
 
-MIT License. Crafted with Apple-grade precision.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Hexagonal architecture, dependency rule, and design patterns.
+- **[docs/designs/whatsappya-3-phase-architecture.md](docs/designs/whatsappya-3-phase-architecture.md)** — Full 3-phase architecture RFC and performance gates.

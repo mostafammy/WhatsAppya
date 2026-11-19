@@ -190,6 +190,9 @@ importers:
       '@whatsappya/platform-node':
         specifier: workspace:*
         version: link:../../packages/platform-node
+      '@whatsappya/viewer':
+        specifier: workspace:*
+        version: link:../../packages/viewer
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -251,6 +254,10 @@ importers:
       '@whatsappya/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
 
 packages:
 

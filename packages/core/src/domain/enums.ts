@@ -21,6 +21,5 @@ export type Direction = (typeof Direction)[keyof typeof Direction];
 export const DateOrder = {
   DayFirst: "day_first",
   MonthFirst: "month_first",
-  YearFirst: "year_first",
 } as const;
 export type DateOrder = (typeof DateOrder)[keyof typeof DateOrder];

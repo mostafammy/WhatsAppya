@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "title": "Chat with سارة",
+  "contactName": "سارة",
+  "ownerName": "Omar",
+  "dateOrder": "day_first",
+  "messages": [
+    {
+      "id": "m0",
+      "rawDate": "17/11/2026",
+      "rawTime": "21:04",
+      "timestamp": "2026-11-17T21:04:00.000Z",
+      "sender": "سارة",
+      "text": "مساء الخير",
+      "kind": "message",
+      "direction": "received",
+      "attachment": null,
+      "isDeleted": false,
+      "isEdited": false
+    },
+    {
+      "id": "m1",
+      "rawDate": "17/11/2026",
+      "rawTime": "21:05",
+      "timestamp": "2026-11-17T21:05:00.000Z",
+      "sender": "Omar",
+      "text": "أهلاً! كيف الحال؟",
+      "kind": "message",
+      "direction": "sent",
+      "attachment": null,
+      "isDeleted": false,
+      "isEdited": false
+    },
+    {
+      "id": "m2",
+      "rawDate": "17/11/2026",
+      "rawTime": "21:06",
+      "timestamp": "2026-11-17T21:06:00.000Z",
+      "sender": "سارة",
+      "text": "",
+      "kind": "message",
+      "direction": "received",
+      "attachment": {
+        "fileName": "<ملف وسائط تم حذفه>",
+        "kind": "omitted",
+        "mimeType": "application/octet-stream",
+        "sizeBytes": 0,
+        "isOmitted": true
+      },
+      "isDeleted": false,
+      "isEdited": false
+    }
+  ],
+  "senderCounts": {
+    "سارة": 2,
+    "Omar": 1
+  }
+}

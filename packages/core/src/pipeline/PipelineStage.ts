@@ -4,6 +4,7 @@ import type { FileSource } from "../ports/FileSource.js";
 export interface PipelineContext {
   readonly files: FileSource;
   readonly ownerName: string | null;
+  readonly chatPath?: string;
 }
 
 /**

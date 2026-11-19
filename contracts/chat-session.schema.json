@@ -2,24 +2,51 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://whatsappya.app/schemas/chat-session.v1.json",
   "title": "ChatSession v1",
-  "description": "Cross-language contract. TypeScript (packages/core) and Swift (WhatsAppyaCore) MUST both produce output that validates against this schema and matches fixtures/golden.",
+  "description": "Cross-language contract. TypeScript (@whatsappya/core) and Swift (WhatsAppyaCore) MUST both produce output conforming to this schema and matching fixtures/golden.",
   "type": "object",
-  "required": ["schemaVersion", "title", "contactName", "ownerName", "messages"],
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "title",
+    "contactName",
+    "ownerName",
+    "dateOrder",
+    "messages",
+    "senderCounts"
+  ],
   "properties": {
     "schemaVersion": { "const": 1 },
     "title": { "type": "string" },
     "contactName": { "type": "string" },
     "ownerName": { "type": ["string", "null"] },
+    "dateOrder": { "enum": ["day_first", "month_first"] },
+    "senderCounts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer" }
+    },
     "messages": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "rawDate", "rawTime", "sender", "text", "kind", "direction"],
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "rawDate",
+          "rawTime",
+          "timestamp",
+          "sender",
+          "text",
+          "kind",
+          "direction",
+          "isDeleted",
+          "isEdited",
+          "attachment"
+        ],
         "properties": {
           "id": { "type": "string" },
           "rawDate": { "type": "string" },
           "rawTime": { "type": "string" },
-          "timestamp": { "type": ["string", "null"], "format": "date-time" },
+          "timestamp": { "type": ["string", "null"] },
           "sender": { "type": ["string", "null"] },
           "text": { "type": "string" },
           "kind": { "enum": ["message", "system", "call"] },
@@ -28,6 +55,7 @@
           "isEdited": { "type": "boolean" },
           "attachment": {
             "type": ["object", "null"],
+            "additionalProperties": false,
             "required": ["fileName", "kind", "mimeType", "sizeBytes", "isOmitted"],
             "properties": {
               "fileName": { "type": "string" },
@@ -46,7 +74,13 @@
               },
               "mimeType": { "type": "string" },
               "sizeBytes": { "type": "integer", "minimum": 0 },
-              "isOmitted": { "type": "boolean" }
+              "isOmitted": { "type": "boolean" },
+              "isAnimated": { "type": "boolean" },
+              "durationSeconds": { "type": "number" },
+              "waveformPeaks": {
+                "type": "array",
+                "items": { "type": "number" }
+              }
             }
           }
         }

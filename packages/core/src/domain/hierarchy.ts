@@ -42,3 +42,35 @@ export interface CurriculumRoot extends HierarchyNodeBase {
 
 /** Discriminated union over all nodes in the curricular composite tree. */
 export type HierarchyNode = CurriculumRoot | BlockNode | SubjectNode | ChapterNode;
+
+/** Export format detected for an archive folder. */
+export type ExportFormat = "ios" | "android" | "unknown";
+
+/** Summary metadata for a discovered chat node in an archive tree. */
+export interface ChatSummaryNode {
+  readonly id: string;
+  readonly title: string;
+  readonly contactName: string;
+  readonly messageCount: number;
+  readonly path: string;
+  readonly exportFormat: ExportFormat;
+  readonly dateRange?: {
+    readonly start: string | null;
+    readonly end: string | null;
+  };
+}
+
+/** Recursive folder node conforming to contracts/archive-tree.schema.json. */
+export interface ArchiveFolder {
+  readonly id: string;
+  readonly name: string;
+  readonly path: string;
+  readonly children: readonly ArchiveFolder[];
+  readonly chats: readonly ChatSummaryNode[];
+}
+
+/** Archive root container. */
+export interface ArchiveTree {
+  readonly schemaVersion: 1;
+  readonly root: ArchiveFolder;
+}
