@@ -18,7 +18,18 @@ struct ChatSessionView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 6) {
-                ForEach(filteredMessages) { message in
+                ForEach(Array(filteredMessages.enumerated()), id: \.element.id) { idx, message in
+                    let prevDate = idx > 0 ? dateKey(for: filteredMessages[idx - 1]) : ""
+                    if dateKey(for: message) != prevDate {
+                        Text(message.rawDate)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .padding(.top, 10)
+                            .padding(.bottom, 4)
+                    }
                     MessageRowView(message: message)
                 }
             }
@@ -41,6 +52,13 @@ struct ChatSessionView: View {
         .sheet(isPresented: $isStatsPresented) {
             ChatStatsView(session: session)
         }
+    }
+
+    private func dateKey(for message: ChatMessage) -> String {
+        if let ts = message.timestamp, ts.count >= 10 {
+            return String(ts.prefix(10))
+        }
+        return message.rawDate
     }
 }
 

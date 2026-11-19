@@ -8,7 +8,30 @@ import { FenwickTree } from "./FenwickTree.js";
 
 const OVERSCAN = 8;
 const DEFAULT_ROW_HEIGHT = 76;
+const DATE_SEPARATOR_EXTRA_HEIGHT = 46;
 const MAX_CSS_HEIGHT = 10_000_000;
+
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function formatDateLabel(msg: ChatMessage): string {
+  if (msg.timestamp) {
+    const dt = new Date(msg.timestamp);
+    if (!Number.isNaN(dt.getTime())) {
+      return DATE_FORMATTER.format(dt);
+    }
+  }
+  return msg.rawDate;
+}
+
+function getDateKey(msg: ChatMessage | undefined): string {
+  if (!msg) return "";
+  return msg.timestamp ? msg.timestamp.slice(0, 10) : msg.rawDate;
+}
 
 export type RowArchetype = "text" | "audio" | "media" | "sticker" | "system";
 
@@ -134,6 +157,26 @@ export class WaMessageList extends HTMLElement {
         .row.sent { align-items: flex-end; }
         .row.received { align-items: flex-start; }
         .row.system, .row.call { align-items: center; }
+        .date-separator {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          margin: 14px 0 10px;
+          pointer-events: none;
+        }
+        .date-separator span {
+          background: var(--wa-date-bg);
+          color: var(--wa-text-secondary);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          padding: 5px 14px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: -0.05px;
+          box-shadow: var(--wa-shadow-sm);
+          border: 1px solid var(--wa-border);
+        }
         .bubble {
           position: relative;
           max-width: min(72%, 580px);
@@ -336,6 +379,13 @@ export class WaMessageList extends HTMLElement {
     this.#clearActiveRows();
     this.#pendingHeights.clear();
     this.#tree = new FenwickTree(this.#messages.length, DEFAULT_ROW_HEIGHT);
+    for (let i = 0; i < this.#messages.length; i++) {
+      const msg = this.#messages[i];
+      const prev = i > 0 ? this.#messages[i - 1] : undefined;
+      if (msg && getDateKey(msg) !== getDateKey(prev)) {
+        this.#tree.update(i, DEFAULT_ROW_HEIGHT + DATE_SEPARATOR_EXTRA_HEIGHT);
+      }
+    }
     this.#updateCanvasHeight();
     this.#scroller.scrollTop = 0;
     this.#render();
@@ -378,10 +428,11 @@ export class WaMessageList extends HTMLElement {
   #render(): void {
     const { start, end, firstVisible } = this.#computeRange();
 
-    // Update external sticky date overlay pill
+    // Update floating top sticky date pill (hidden at top=0 so it doesn't double-stack with row 0's inline date)
     const topMsg = firstVisible >= 0 ? this.#messages[firstVisible] : undefined;
-    if (topMsg?.rawDate) {
-      this.#stickyDate.textContent = topMsg.rawDate;
+    const isRow0InlineVisible = this.#scroller.scrollTop <= 36;
+    if (topMsg && !isRow0InlineVisible) {
+      this.#stickyDate.textContent = formatDateLabel(topMsg);
       this.#stickyDate.classList.add("visible");
     } else {
       this.#stickyDate.classList.remove("visible");
@@ -464,6 +515,16 @@ export class WaMessageList extends HTMLElement {
     row.className = "row";
     row.dataset.index = String(index);
     row.dataset.id = msg.id;
+
+    const prevMsg = index > 0 ? this.#messages[index - 1] : undefined;
+    if (getDateKey(msg) !== getDateKey(prevMsg)) {
+      const sep = document.createElement("div");
+      sep.className = "date-separator";
+      const badge = document.createElement("span");
+      badge.textContent = formatDateLabel(msg);
+      sep.appendChild(badge);
+      row.appendChild(sep);
+    }
 
     if (msg.kind === "system" || msg.kind === "call") {
       row.classList.add(msg.kind);
