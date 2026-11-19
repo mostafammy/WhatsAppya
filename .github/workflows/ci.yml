@@ -1,5 +1,16 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   typescript:
@@ -8,9 +19,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version-file: .nvmrc, cache: pnpm }
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
+      - run: pnpm --filter @whatsappya/web build
+      - run: pnpm --filter @whatsappya/cli build
 
   swift:
     runs-on: macos-15
@@ -18,11 +33,13 @@ jobs:
       - uses: actions/checkout@v4
       - run: tools/scripts/sync-fixtures.sh
       - run: swift test --package-path apps/ios/Packages/WhatsAppyaKit
+      - run: swift run --package-path apps/ios/Packages/WhatsAppyaKit WhatsAppyaGoldenVerifier
 
   legacy-python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: python -m unittest discover tests
+        with:
+          python-version: "3.12"
+      - run: PYTHONPATH=legacy/python python -m unittest discover legacy/python/tests
