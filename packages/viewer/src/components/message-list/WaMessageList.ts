@@ -56,6 +56,13 @@ function getDateKey(msg: ChatMessage | undefined): string {
   return msg.timestamp ? msg.timestamp.slice(0, 10) : msg.rawDate;
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 102.4) / 10} KB`;
+  return `${Math.round(bytes / (1024 * 102.4)) / 10} MB`;
+}
+
 export type RowArchetype = "text" | "audio" | "media" | "sticker" | "system";
 
 function classifyArchetype(msg: ChatMessage): RowArchetype {
@@ -71,6 +78,8 @@ function classifyArchetype(msg: ChatMessage): RowArchetype {
 interface ActiveRowEntry {
   readonly el: HTMLDivElement;
   readonly archetype: RowArchetype;
+  readonly leasedFiles: string[];
+  released: boolean;
 }
 
 /**
@@ -310,6 +319,16 @@ export class WaMessageList extends HTMLElement {
           font-size: 12.5px;
           text-decoration: none;
           color: inherit;
+          text-align: start;
+        }
+        button.file-chip {
+          width: 100%;
+          font-family: inherit;
+          cursor: pointer;
+          transition: background var(--wa-duration-fast) var(--wa-spring);
+        }
+        button.file-chip:hover {
+          background: rgba(0, 122, 255, 0.14);
         }
         .omitted-note {
           font-size: 12.5px;
@@ -414,11 +433,21 @@ export class WaMessageList extends HTMLElement {
     this.#render();
   }
 
+  #releaseRow(entry: ActiveRowEntry): void {
+    entry.released = true;
+    this.#resizeObserver?.unobserve(entry.el);
+    for (const file of entry.leasedFiles) {
+      this.#leases.release(file);
+    }
+    entry.leasedFiles.length = 0;
+    entry.el.innerHTML = "";
+    entry.el.remove();
+    this.#pools.get(entry.archetype)?.push(entry.el);
+  }
+
   #clearActiveRows(): void {
     for (const entry of this.#activeRows.values()) {
-      this.#resizeObserver?.unobserve(entry.el);
-      entry.el.remove();
-      this.#pools.get(entry.archetype)?.push(entry.el);
+      this.#releaseRow(entry);
     }
     this.#activeRows.clear();
   }
@@ -464,9 +493,7 @@ export class WaMessageList extends HTMLElement {
     // Recycle rows outside visible window back into their exact archetype pool
     for (const [idx, entry] of this.#activeRows) {
       if (idx < start || idx > end) {
-        this.#resizeObserver?.unobserve(entry.el);
-        entry.el.remove();
-        this.#pools.get(entry.archetype)?.push(entry.el);
+        this.#releaseRow(entry);
         this.#activeRows.delete(idx);
       }
     }
@@ -482,8 +509,14 @@ export class WaMessageList extends HTMLElement {
       if (!active) {
         const archetype = classifyArchetype(msg);
         const row = this.#pools.get(archetype)?.pop() ?? document.createElement("div");
-        this.#populateRow(row, msg, i);
-        active = { el: row, archetype };
+        const entry: ActiveRowEntry = {
+          el: row,
+          archetype,
+          leasedFiles: [],
+          released: false,
+        };
+        this.#populateRow(row, msg, i, entry);
+        active = entry;
         this.#activeRows.set(i, active);
         this.#rowIndexLookup.set(row, i);
         this.#resizeObserver?.observe(row);
@@ -533,7 +566,7 @@ export class WaMessageList extends HTMLElement {
     }
   }
 
-  #populateRow(row: HTMLDivElement, msg: ChatMessage, index: number): void {
+  #populateRow(row: HTMLDivElement, msg: ChatMessage, index: number, entry: ActiveRowEntry): void {
     row.innerHTML = "";
     row.className = "row";
     row.dataset.index = String(index);
@@ -572,7 +605,7 @@ export class WaMessageList extends HTMLElement {
     }
 
     if (msg.attachment) {
-      bubble.appendChild(this.#renderAttachment(msg));
+      bubble.appendChild(this.#renderAttachment(msg, entry));
     }
 
     if (msg.text) {
@@ -603,7 +636,7 @@ export class WaMessageList extends HTMLElement {
     row.appendChild(bubble);
   }
 
-  #renderAttachment(msg: ChatMessage): HTMLElement {
+  #renderAttachment(msg: ChatMessage, entry: ActiveRowEntry): HTMLElement {
     const att = msg.attachment;
     if (!att) return document.createElement("span");
 
@@ -651,10 +684,11 @@ export class WaMessageList extends HTMLElement {
 
       if (att.kind === "image") {
         void this.#leases.acquire(att.fileName, att.mimeType).then((url) => {
-          if (!thumb.isConnected) {
+          if (entry.released) {
             this.#leases.release(att.fileName);
             return;
           }
+          entry.leasedFiles.push(att.fileName);
           const img = document.createElement("img");
           img.src = url;
           img.alt = msg.text || att.fileName;
@@ -690,9 +724,43 @@ export class WaMessageList extends HTMLElement {
       return thumb;
     }
 
-    const chip = document.createElement("div");
+    const sizeLabel = formatFileSize(att.sizeBytes);
+    const chip = document.createElement("button");
+    chip.type = "button";
     chip.className = "file-chip";
-    chip.textContent = `📎 ${att.fileName}`;
+
+    if (att.kind === "pdf") {
+      chip.setAttribute("aria-label", `Preview PDF ${att.fileName}`);
+      chip.textContent = sizeLabel ? `📄 ${att.fileName} (${sizeLabel})` : `📄 ${att.fileName}`;
+      chip.addEventListener("click", () => {
+        const item: LightboxItem = {
+          fileName: att.fileName,
+          mimeType: att.mimeType || "application/pdf",
+          kind: "pdf",
+          ...(msg.text ? { caption: msg.text } : {}),
+        };
+        this.dispatchEvent(
+          new CustomEvent("wa-media-open", {
+            bubbles: true,
+            composed: true,
+            detail: { item },
+          }),
+        );
+      });
+      return chip;
+    }
+
+    chip.setAttribute("aria-label", `Download ${att.fileName}`);
+    chip.textContent = sizeLabel ? `📎 ${att.fileName} (${sizeLabel})` : `📎 ${att.fileName}`;
+    chip.addEventListener("click", () => {
+      void this.#leases.acquire(att.fileName, att.mimeType).then((url) => {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = att.fileName;
+        anchor.click();
+        setTimeout(() => this.#leases.release(att.fileName), 1000);
+      });
+    });
     return chip;
   }
 }

@@ -46,6 +46,30 @@ export class MediaLeaseManager {
     return this.#currentBytes;
   }
 
+  getRefCount(fileName: string): number {
+    return this.#entries.get(fileName)?.refCount ?? 0;
+  }
+
+  /**
+   * Resolves raw underlying `Blob` bytes on demand without pinning a `blob:` ObjectURL.
+   * Useful for binary container inspection such as `.was` Lottie sticker archives.
+   */
+  async resolveRawBlob(fileName: string, mimeType: string): Promise<Blob | null> {
+    try {
+      if (this.#resolver) {
+        const resolved = await this.#resolver.resolveMedia(fileName, mimeType);
+        return typeof resolved === "string" ? null : resolved;
+      }
+      if (typeof fetch === "function") {
+        const res = await fetch(encodeURI(fileName));
+        return res.ok ? await res.blob() : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async acquire(fileName: string, mimeType: string): Promise<string> {
     const existing = this.#entries.get(fileName);
     if (existing) {

@@ -1,5 +1,9 @@
 import { type ChatSession, type HybridSearchHit, HybridSearchIndex } from "@whatsappya/core";
-import type { LightboxItem, WaLightbox } from "./components/lightbox/WaLightbox.js";
+import {
+  type LightboxItem,
+  type WaLightbox,
+  collectMediaGallery,
+} from "./components/lightbox/WaLightbox.js";
 import type { WaMessageList } from "./components/message-list/WaMessageList.js";
 import type { WaBreadcrumbs } from "./components/navigation/WaBreadcrumbs.js";
 import type { WaSearch } from "./components/search/WaSearch.js";
@@ -9,23 +13,6 @@ import "./components/navigation/WaBreadcrumbs.js";
 import "./components/search/WaSearch.js";
 import "./components/sticker/WaSticker.js";
 import "./components/voice-note/WaVoiceNote.js";
-
-function collectGallery(session: ChatSession): LightboxItem[] {
-  const gallery: LightboxItem[] = [];
-  for (const msg of session.messages) {
-    const att = msg.attachment;
-    if (!att || att.isOmitted) continue;
-    if (att.kind === "image" || att.kind === "video") {
-      gallery.push({
-        fileName: att.fileName,
-        mimeType: att.mimeType,
-        kind: att.kind,
-        ...(msg.text ? { caption: msg.text } : {}),
-      });
-    }
-  }
-  return gallery;
-}
 
 function bootStandaloneViewer(): void {
   const dataEl = document.getElementById("chat-data");
@@ -52,10 +39,14 @@ function bootStandaloneViewer(): void {
     list.session = session;
   }
 
-  const gallery = collectGallery(session);
+  const gallery = collectMediaGallery(session);
   list?.addEventListener("wa-media-open", (e) => {
     const item = (e as CustomEvent<{ item: LightboxItem }>).detail.item;
-    void lightbox?.open(item, gallery);
+    if (item.kind === "pdf") {
+      void lightbox?.open(item);
+    } else {
+      void lightbox?.open(item, gallery);
+    }
   });
 
   search?.addEventListener("wa-search-select", (e) => {

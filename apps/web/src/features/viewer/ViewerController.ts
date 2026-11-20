@@ -12,6 +12,7 @@ import {
   type WaMessageList,
   type WaSearch,
   type WaSplitView,
+  collectMediaGallery,
   countArchiveChats,
   defaultMediaLeases,
   unwrapSingleChat,
@@ -29,6 +30,7 @@ export class ViewerController {
   readonly #searchClient = new SearchWorkerClient();
   readonly #sessionsCache = new Map<string, ChatSession>();
   #activeSession: ChatSession | null = null;
+  #activeGallery: LightboxItem[] = [];
   #splitView!: WaSplitView;
   #messageList!: WaMessageList;
   #search!: WaSearch;
@@ -224,7 +226,11 @@ export class ViewerController {
 
     this.#messageList.addEventListener("wa-media-open", (e) => {
       const item = (e as CustomEvent<{ item: LightboxItem }>).detail.item;
-      void this.#lightbox.open(item);
+      if (item.kind === "pdf") {
+        void this.#lightbox.open(item);
+      } else {
+        void this.#lightbox.open(item, this.#activeGallery);
+      }
     });
 
     this.root.querySelector(".stats-btn")?.addEventListener("click", () => {
@@ -252,6 +258,7 @@ export class ViewerController {
     }
 
     this.#activeSession = session;
+    this.#activeGallery = collectMediaGallery(session);
     this.#splitView.activeChatId = chat.id;
     this.#messageList.session = session;
     this.#search.searchIndex = this.#searchClient;

@@ -14,7 +14,11 @@ export {
 } from "./components/voice-note/AudioPlaybackController.js";
 export { WaVoiceNote } from "./components/voice-note/WaVoiceNote.js";
 export { WaSticker } from "./components/sticker/WaSticker.js";
-export { WaLightbox, type LightboxItem } from "./components/lightbox/WaLightbox.js";
+export {
+  WaLightbox,
+  collectMediaGallery,
+  type LightboxItem,
+} from "./components/lightbox/WaLightbox.js";
 export { WaSearch, type AsyncSearchProvider } from "./components/search/WaSearch.js";
 export {
   WaBreadcrumbs,

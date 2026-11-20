@@ -7,6 +7,7 @@
       "legacy/**",
       "converter/**",
       "assets/**",
+      "apps/web/public/vendor/**",
       "*.min.js",
       "script.js",
       "style.css",

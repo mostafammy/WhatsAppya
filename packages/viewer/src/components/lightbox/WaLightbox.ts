@@ -1,26 +1,51 @@
+import type { ChatSession } from "@whatsappya/core";
 import { type MediaLeaseManager, defaultMediaLeases } from "../../media/MediaLeaseManager.js";
 import { VIEWER_BASE_CSS } from "../../styles/theme.js";
 
 export interface LightboxItem {
   readonly fileName: string;
   readonly mimeType: string;
-  readonly kind: "image" | "video";
+  readonly kind: "image" | "video" | "pdf";
   readonly caption?: string;
 }
 
 /**
+ * Collects all non-omitted image and video attachments in a session
+ * for prev/next gallery browsing in `<wa-lightbox>`.
+ */
+export function collectMediaGallery(session: ChatSession): LightboxItem[] {
+  const gallery: LightboxItem[] = [];
+  for (const msg of session.messages) {
+    const att = msg.attachment;
+    if (!att || att.isOmitted) continue;
+    if (att.kind === "image" || att.kind === "video") {
+      gallery.push({
+        fileName: att.fileName,
+        mimeType: att.mimeType,
+        kind: att.kind,
+        ...(msg.text ? { caption: msg.text } : {}),
+      });
+    }
+  }
+  return gallery;
+}
+
+/**
  * `<wa-lightbox>`
- * Apple QuickLook-inspired full-screen media viewer with keyboard navigation
- * (Escape, ArrowLeft, ArrowRight), focus management, and MediaLease lifecycle.
+ * Apple QuickLook-inspired full-screen media & PDF viewer with keyboard navigation
+ * (Escape, ArrowLeft, ArrowRight), download action, gallery counter, and MediaLease lifecycle.
  */
 export class WaLightbox extends HTMLElement {
   #leases: MediaLeaseManager = defaultMediaLeases;
   #items: LightboxItem[] = [];
   #index = 0;
   #leasedFile: string | null = null;
+  #renderSeq = 0;
   #backdrop: HTMLDivElement;
   #stage: HTMLDivElement;
   #caption: HTMLDivElement;
+  #counter: HTMLSpanElement;
+  #downloadLink: HTMLAnchorElement;
   #closeBtn: HTMLButtonElement;
   #prevBtn: HTMLButtonElement;
   #nextBtn: HTMLButtonElement;
@@ -56,8 +81,15 @@ export class WaLightbox extends HTMLElement {
           top: 16px;
           right: 16px;
           display: flex;
-          gap: 8px;
+          align-items: center;
+          gap: 10px;
           z-index: 2;
+        }
+        .counter {
+          color: #e9edef;
+          font-size: 13px;
+          font-weight: 600;
+          margin-right: 4px;
         }
         .icon-btn {
           width: 40px;
@@ -67,6 +99,7 @@ export class WaLightbox extends HTMLElement {
           background: rgba(32, 44, 51, 0.78);
           color: #fff;
           font-size: 18px;
+          text-decoration: none;
           cursor: pointer;
           display: inline-flex;
           align-items: center;
@@ -94,6 +127,14 @@ export class WaLightbox extends HTMLElement {
           box-shadow: var(--wa-shadow-lg);
           object-fit: contain;
         }
+        .stage iframe {
+          width: min(92vw, 960px);
+          height: 82vh;
+          border: none;
+          border-radius: 12px;
+          background: #fff;
+          box-shadow: var(--wa-shadow-lg);
+        }
         .caption {
           margin-top: 14px;
           color: #e9edef;
@@ -104,6 +145,8 @@ export class WaLightbox extends HTMLElement {
       </style>
       <div class="backdrop" role="dialog" aria-modal="true" aria-label="Media preview">
         <div class="toolbar">
+          <span class="counter" aria-live="polite"></span>
+          <a class="icon-btn download-btn" download aria-label="Download file" title="Download">⬇</a>
           <button class="icon-btn close-btn" type="button" aria-label="Close preview">✕</button>
         </div>
         <button class="icon-btn nav-btn prev-btn" type="button" aria-label="Previous media">‹</button>
@@ -116,17 +159,30 @@ export class WaLightbox extends HTMLElement {
     const backdrop = shadow.querySelector<HTMLDivElement>(".backdrop");
     const stage = shadow.querySelector<HTMLDivElement>(".stage");
     const caption = shadow.querySelector<HTMLDivElement>(".caption");
+    const counter = shadow.querySelector<HTMLSpanElement>(".counter");
+    const downloadLink = shadow.querySelector<HTMLAnchorElement>(".download-btn");
     const closeBtn = shadow.querySelector<HTMLButtonElement>(".close-btn");
     const prevBtn = shadow.querySelector<HTMLButtonElement>(".prev-btn");
     const nextBtn = shadow.querySelector<HTMLButtonElement>(".next-btn");
 
-    if (!backdrop || !stage || !caption || !closeBtn || !prevBtn || !nextBtn) {
+    if (
+      !backdrop ||
+      !stage ||
+      !caption ||
+      !counter ||
+      !downloadLink ||
+      !closeBtn ||
+      !prevBtn ||
+      !nextBtn
+    ) {
       throw new Error("WaLightbox shadow DOM failed");
     }
 
     this.#backdrop = backdrop;
     this.#stage = stage;
     this.#caption = caption;
+    this.#counter = counter;
+    this.#downloadLink = downloadLink;
     this.#closeBtn = closeBtn;
     this.#prevBtn = prevBtn;
     this.#nextBtn = nextBtn;
@@ -157,9 +213,11 @@ export class WaLightbox extends HTMLElement {
   }
 
   close(): void {
+    this.#renderSeq++;
     this.removeAttribute("open");
     document.removeEventListener("keydown", this.#onKeyDownBound);
     this.#stage.innerHTML = "";
+    this.#downloadLink.removeAttribute("href");
     this.#releaseCurrent();
     this.dispatchEvent(new CustomEvent("wa-lightbox-close"));
   }
@@ -187,13 +245,23 @@ export class WaLightbox extends HTMLElement {
     const current = this.#items[this.#index];
     if (!current) return;
 
-    this.#prevBtn.style.display = this.#items.length > 1 ? "inline-flex" : "none";
-    this.#nextBtn.style.display = this.#items.length > 1 ? "inline-flex" : "none";
+    const seq = ++this.#renderSeq;
+    const hasGallery = this.#items.length > 1;
+    this.#prevBtn.style.display = hasGallery ? "inline-flex" : "none";
+    this.#nextBtn.style.display = hasGallery ? "inline-flex" : "none";
+    this.#counter.textContent = hasGallery ? `${this.#index + 1} / ${this.#items.length}` : "";
     this.#caption.textContent = current.caption ?? current.fileName;
 
     this.#releaseCurrent();
     const url = await this.#leases.acquire(current.fileName, current.mimeType);
+    if (seq !== this.#renderSeq || !this.hasAttribute("open")) {
+      this.#leases.release(current.fileName);
+      return;
+    }
+
     this.#leasedFile = current.fileName;
+    this.#downloadLink.href = url;
+    this.#downloadLink.download = current.fileName;
 
     this.#stage.innerHTML = "";
     if (current.kind === "video") {
@@ -203,6 +271,11 @@ export class WaLightbox extends HTMLElement {
       video.autoplay = true;
       video.playsInline = true;
       this.#stage.appendChild(video);
+    } else if (current.kind === "pdf") {
+      const frame = document.createElement("iframe");
+      frame.src = url;
+      frame.title = current.caption ?? current.fileName;
+      this.#stage.appendChild(frame);
     } else {
       const img = document.createElement("img");
       img.src = url;
