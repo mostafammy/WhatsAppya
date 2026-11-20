@@ -28,6 +28,8 @@ __pycache__/
 # ── Monorepo (TypeScript) ──
 node_modules/
 .turbo/
+.cloudflare/
+.wrangler/
 coverage/
 *.tsbuildinfo
 .vite/
