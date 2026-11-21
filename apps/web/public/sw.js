@@ -1,13 +1,17 @@
-const SHELL_CACHE = "whatsappya-shell-v1";
+const SHELL_CACHE = "whatsappya-shell-v2";
 const SHARE_CACHE = "whatsappya-share-v1";
 const SHARED_EXPORT_KEY = "/shared-export";
+const PRECACHE_URLS = [
+  "/",
+  "/manifest.webmanifest",
+  "/icons/icon.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(["/", "/manifest.webmanifest", "/icons/icon.svg"])),
-  );
+  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)));
   self.skipWaiting();
 });
 
@@ -52,6 +56,33 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Network-first for HTML navigations so fresh deploys replace stale app shells automatically
+  const isNavigation =
+    event.request.mode === "navigate" || url.pathname === "/" || url.pathname === "/index.html";
+  if (isNavigation) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok && response.type === "basic") {
+            const copy = response.clone();
+            const rootCopy = url.pathname === "/" && url.search ? response.clone() : null;
+            void caches.open(SHELL_CACHE).then(async (cache) => {
+              await cache.put(event.request, copy);
+              if (rootCopy) await cache.put("/", rootCopy);
+            });
+          }
+          return response;
+        })
+        .catch(async () => {
+          return (
+            (await caches.match(event.request)) || (await caches.match("/")) || Response.error()
+          );
+        }),
+    );
+    return;
+  }
+
+  // Cache-first for hashed static assets and icons
   event.respondWith(
     caches.match(event.request).then(
       (cached) =>

@@ -4,7 +4,12 @@ import {
   type FileSource,
   parseOggOpusDuration,
 } from "@whatsappya/core";
-import { type ExportAssets, StandaloneHtmlExporter, escapeHtml } from "./StandaloneHtmlExporter.js";
+import {
+  type ExportAssets,
+  StandaloneHtmlExporter,
+  escapeHtml,
+  uint8ToBase64,
+} from "./StandaloneHtmlExporter.js";
 
 export interface BundleOutputFile {
   readonly relativePath: string;
@@ -133,24 +138,4 @@ function buildLauncherHtml(relativeTarget: string, contactName: string): string 
   <script>window.location.replace(${JSON.stringify(relativeTarget)});</script>
 </body>
 </html>`;
-}
-
-const B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 3) {
-    const b0 = bytes[i] ?? 0;
-    const has1 = i + 1 < bytes.length;
-    const has2 = i + 2 < bytes.length;
-    const b1 = bytes[i + 1] ?? 0;
-    const b2 = bytes[i + 2] ?? 0;
-    const n = (b0 << 16) | (b1 << 8) | b2;
-    out +=
-      (B64_ALPHABET[(n >>> 18) & 63] ?? "") +
-      (B64_ALPHABET[(n >>> 12) & 63] ?? "") +
-      (has1 ? (B64_ALPHABET[(n >>> 6) & 63] ?? "") : "=") +
-      (has2 ? (B64_ALPHABET[n & 63] ?? "") : "=");
-  }
-  return out;
 }

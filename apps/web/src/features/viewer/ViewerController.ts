@@ -1,4 +1,5 @@
 import type {
+  ArchiveFolder,
   ArchiveTree,
   ChatSession,
   ChatSummaryNode,
@@ -22,6 +23,8 @@ import { createConvertChat } from "../../app/container.js";
 import { openStatsModal } from "../stats/StatsModal.js";
 import { SearchWorkerClient } from "./SearchWorkerClient.js";
 
+export const ACTIVE_CHAT_STORAGE_KEY = "whatsappya:active-chat-id";
+
 /**
  * Feature slice: single Cupertino frosted-glass header + `<wa-split-view>` + `<wa-message-list>`
  * + `<wa-search>` (Web Worker) + `<wa-lightbox>` + Insights + Offline HTML export.
@@ -31,6 +34,7 @@ export class ViewerController {
   readonly #sessionsCache = new Map<string, ChatSession>();
   #activeSession: ChatSession | null = null;
   #activeGallery: LightboxItem[] = [];
+  #exportResetTimer: ReturnType<typeof setTimeout> | null = null;
   #splitView!: WaSplitView;
   #messageList!: WaMessageList;
   #search!: WaSearch;
@@ -204,9 +208,13 @@ export class ViewerController {
 
     this.#bindEvents();
 
-    const firstChat = unwrapSingleChat(this.tree.root) ?? this.#findFirstChat(this.tree);
-    if (firstChat) {
-      await this.#loadChat(firstChat);
+    const savedChatId = this.#readActiveChatId();
+    const initialChat =
+      (savedChatId ? this.#findChatById(this.tree.root, savedChatId) : null) ??
+      unwrapSingleChat(this.tree.root) ??
+      this.#findFirstChat(this.tree);
+    if (initialChat) {
+      await this.#loadChat(initialChat);
     }
   }
 
@@ -236,8 +244,11 @@ export class ViewerController {
     this.root.querySelector(".stats-btn")?.addEventListener("click", () => {
       if (this.#activeSession) openStatsModal(this.#activeSession);
     });
-    this.root.querySelector(".export-btn")?.addEventListener("click", () => this.#exportHtml());
+    this.root
+      .querySelector(".export-btn")
+      ?.addEventListener("click", () => void this.#exportHtml());
     this.root.querySelector(".reset-btn")?.addEventListener("click", () => {
+      if (this.#exportResetTimer) clearTimeout(this.#exportResetTimer);
       this.#searchClient.dispose();
       defaultMediaLeases.disposeAll();
       this.root.dispatchEvent(new CustomEvent("wa-viewer-reset", { bubbles: true }));
@@ -257,6 +268,7 @@ export class ViewerController {
       void this.#searchClient.indexSession(session, chat.id);
     }
 
+    this.#saveActiveChatId(chat.id);
     this.#activeSession = session;
     this.#activeGallery = collectMediaGallery(session);
     this.#splitView.activeChatId = chat.id;
@@ -271,6 +283,19 @@ export class ViewerController {
     this.#avatarEl.textContent = initial ? initial.toUpperCase() : "💬";
   }
 
+  #findChatById(root: ArchiveFolder, id: string): ChatSummaryNode | null {
+    const queue = [root];
+    while (queue.length > 0) {
+      const folder = queue.shift();
+      if (!folder) continue;
+      for (const chat of folder.chats) {
+        if (chat.id === id) return chat;
+      }
+      queue.push(...folder.children);
+    }
+    return null;
+  }
+
   #findFirstChat(tree: ArchiveTree): ChatSummaryNode | null {
     const queue = [tree.root];
     while (queue.length > 0) {
@@ -282,19 +307,65 @@ export class ViewerController {
     return null;
   }
 
-  #exportHtml(): void {
+  #readActiveChatId(): string | null {
+    try {
+      return sessionStorage.getItem(ACTIVE_CHAT_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  #saveActiveChatId(chatId: string): void {
+    try {
+      sessionStorage.setItem(ACTIVE_CHAT_STORAGE_KEY, chatId);
+    } catch {
+      // Ignore environments without sessionStorage
+    }
+  }
+
+  async #exportHtml(): Promise<void> {
     if (!this.#activeSession) return;
-    const exporter = new StandaloneHtmlExporter({
-      viewerJs: STANDALONE_VIEWER_JS,
-      viewerCss: STANDALONE_VIEWER_CSS,
-    });
-    const html = exporter.build(this.#activeSession);
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${this.#activeSession.contactName || "chat"}.html`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const exportBtn = this.root.querySelector<HTMLButtonElement>(".export-btn");
+    if (exportBtn?.disabled) return;
+
+    if (this.#exportResetTimer) {
+      clearTimeout(this.#exportResetTimer);
+      this.#exportResetTimer = null;
+    }
+    if (exportBtn) {
+      exportBtn.disabled = true;
+      exportBtn.textContent = "Exporting…";
+    }
+
+    let feedbackLabel = "Export HTML";
+    try {
+      const exporter = new StandaloneHtmlExporter({
+        viewerJs: STANDALONE_VIEWER_JS,
+        viewerCss: STANDALONE_VIEWER_CSS,
+      });
+      const result = await exporter.buildWithMedia(this.#activeSession, this.files);
+      const blob = new Blob([result.html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${this.#activeSession.contactName || "chat"}.html`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      feedbackLabel = result.skippedCount > 0 ? "Exported (large files skipped)" : "Exported ✓";
+    } catch {
+      feedbackLabel = "Export failed";
+    } finally {
+      if (exportBtn) {
+        exportBtn.disabled = false;
+        exportBtn.textContent = feedbackLabel;
+        if (feedbackLabel !== "Export HTML") {
+          this.#exportResetTimer = setTimeout(() => {
+            exportBtn.textContent = "Export HTML";
+            this.#exportResetTimer = null;
+          }, 2000);
+        }
+      }
+    }
   }
 }

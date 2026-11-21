@@ -72,4 +72,53 @@ describe("Web PWA SearchWorkerClient & Offline Export", () => {
     expect(html).toContain('id="chat-data"');
     expect(html.length).toBeGreaterThan(30_000);
   });
+
+  it("configures CSP for PDF blob preview, zero-egress connect-src, iOS/Android PNG icons, and v2 network-first SW", () => {
+    interface NodeFsBuiltin {
+      readFileSync(path: URL, encoding: "utf8"): string;
+      statSync(path: URL): { size: number };
+    }
+    const getBuiltin = (
+      globalThis as unknown as {
+        process?: { getBuiltinModule?: (id: string) => unknown };
+      }
+    ).process?.getBuiltinModule;
+    const fs = getBuiltin?.("node:fs") as NodeFsBuiltin | undefined;
+    expect(fs).toBeDefined();
+    if (!fs) return;
+
+    const indexHtml = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    expect(indexHtml).toContain("frame-src 'self' blob:");
+    expect(indexHtml).toContain("connect-src 'none'");
+    expect(indexHtml).toContain("/icons/apple-touch-icon.png");
+
+    const manifestRaw = fs.readFileSync(
+      new URL("../public/manifest.webmanifest", import.meta.url),
+      "utf8",
+    );
+    const manifest = JSON.parse(manifestRaw) as {
+      icons: Array<{ src: string; sizes: string; type: string; purpose?: string }>;
+    };
+    const requiredPngs = [
+      { src: "/icons/icon-192.png", sizes: "192x192", purpose: "any" },
+      { src: "/icons/icon-512.png", sizes: "512x512", purpose: "any" },
+      { src: "/icons/icon-maskable-192.png", sizes: "192x192", purpose: "maskable" },
+      { src: "/icons/icon-maskable-512.png", sizes: "512x512", purpose: "maskable" },
+    ];
+    for (const req of requiredPngs) {
+      const found = manifest.icons.find(
+        (i) => i.src === req.src && i.sizes === req.sizes && i.purpose === req.purpose,
+      );
+      expect(found).toBeDefined();
+      const diskStat = fs.statSync(new URL(`../public${req.src}`, import.meta.url));
+      expect(diskStat.size).toBeGreaterThan(0);
+    }
+    expect(
+      fs.statSync(new URL("../public/icons/apple-touch-icon.png", import.meta.url)).size,
+    ).toBeGreaterThan(0);
+
+    const swSource = fs.readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+    expect(swSource).toContain('SHELL_CACHE = "whatsappya-shell-v2"');
+    expect(swSource).toContain('event.request.mode === "navigate"');
+  });
 });
